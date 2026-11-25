@@ -1,6 +1,8 @@
 import * as THREE from 'three';
-import { cloneModel, localBox } from './assets.js';
+import { cloneModel, loadCustomModel, localBox } from './assets.js';
+import { buildOriginalCar } from './original-models.js';
 import { computeSpecs, findPart } from './config.js';
+import { save } from './storage.js';
 
 let glowTexture, shadowTexture, numberCache = new Map();
 
@@ -63,7 +65,12 @@ export async function createCar(setup, { isPlayer = false, ghost = false } = {})
   const root = new THREE.Group();
   root.name = 'car-root';
 
-  const body = await cloneModel(modelDef.model);
+  // Creator Series bodies are original geometry; "YOUR MODEL" is a user GLB;
+  // everything else is one of the bundled CC0 models.
+  let body;
+  if (modelDef.custom && save.customModel?.data) body = await loadCustomModel(save.customModel.data);
+  else if (modelDef.original) body = buildOriginalCar(modelDef.original, paint, accent);
+  else body = await cloneModel(modelDef.model || 'sedan.glb');
   root.add(body);
 
   // Locate embedded wheels before hiding them — they tell us exactly where the hubs are.
@@ -91,12 +98,16 @@ export async function createCar(setup, { isPlayer = false, ghost = false } = {})
     if (!o.isMesh || !o.visible) return;
     o.geometry = o.geometry.clone();
     o.material = o.material.clone();
-    o.material.color = new THREE.Color(paint);
-    o.material.metalness = 0.42;
-    o.material.roughness = 0.32;
+    if (!o.userData.keepMaterial) {
+      o.material.color = new THREE.Color(paint);
+      o.material.metalness = 0.62;
+      o.material.roughness = 0.18;
+      if (o.material.clearcoat !== undefined) o.material.clearcoat = 1;
+      bodyMats.push({ mat: o.material, base: o.material.color.clone() });
+    }
+    if (o.material.envMapIntensity !== undefined) o.material.envMapIntensity = 1.8;
     o.castShadow = true;
     o.receiveShadow = true;
-    bodyMats.push({ mat: o.material, base: o.material.color.clone() });
   });
   body.position.y += specs.ride;
   body.updateWorldMatrix(true, true);

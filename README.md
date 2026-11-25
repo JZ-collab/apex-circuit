@@ -2,6 +2,15 @@
 
 A complete 3D racing + tuning game that ships as **native desktop apps** (macOS `.app` / `.dmg`, Windows `.exe`, Linux) **and** as a browser/GitHub Pages game. One codebase, every platform: Mac, Windows, Linux, Chromebook, tablet and phone.
 
+**Play it now:** [https://jz-collab.github.io/apex-circuit/](https://jz-collab.github.io/apex-circuit/)
+
+## Graphics / creator overhaul
+
+- **Cinematic rendering** — HDR-style bloom, filmic ACES tone mapping, FXAA, procedural PMREM environment reflections, 2048px soft shadows, cool fill lighting, glowing sun/moon discs and night starfields.
+- **Creator Series** — three original, hand-authored 3D cars (GT, Rally and Hyper) built from real geometry, not imported assets. They take paint, metalness, lights, wheels, liveries and tuning exactly like the licensed models.
+- **Your own models** — the garage has a **16 / YOUR MODEL** tab: import any `.glb` / `.gltf` (up to 2.5 MB) made by you or downloaded elsewhere. Models are auto-centred, auto-scaled and auto-oriented, then get the full paint/wheel/light/number treatment. Saved locally on your device.
+- **Studio showroom** — reflective turntable, animated neon light strips, spot lighting and a rotating turntable camera.
+
 ## What's new in v2
 
 - **6 circuits** — Sunset Loop, Industrial Sprint, Coastal Run, Neon District (night), Alpine Pass and Dust Devil desert, each with its own scenery, palette and lighting.
@@ -92,7 +101,7 @@ Any static server works (`npx serve`, `php -S localhost:8000`, etc.). The app al
 
 Alternatively use **Settings → Pages → Deploy from a branch → `main` / `/ (root)`**.
 
-> This repo had no GitHub remote or authenticated CLI at build time, so publishing still requires `gh auth login` followed by `gh repo create <name> --public --source=. --push` (or a manual push plus enabling Pages in settings).
+> This project is published at `https://jz-collab.github.io/apex-circuit/`. To fork it, push your fork to `main` and enable **Pages → GitHub Actions**.
 
 ## Project layout
 
@@ -104,8 +113,10 @@ js/main.js           renderer, race loop, camera, results, ghosts
 js/ui.js             menus, garage, HUD, minimap
 js/physics.js        shared vehicle dynamics (boost, damage, gears)
 js/ai.js             rival racing line
+js/env.js            procedural PMREM environment maps
+js/original-models.js Creator Series original car geometry
 js/effects.js        smoke, sparks, rain (GPU point pools)
-js/car.js            customizable 3D car assembly
+js/car.js            customizable 3D car assembly + user model support
 js/track.js          procedural circuits + themed scenery
 js/storage.js        saves, credits, settings, ghosts
 js/audio.js          procedural Web Audio engine/SFX

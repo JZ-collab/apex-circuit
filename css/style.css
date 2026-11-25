@@ -27,6 +27,13 @@ button { font-family: inherit; color: inherit; }
   background: repeating-linear-gradient(0deg, rgba(255,255,255,.014) 0 1px, transparent 1px 4px);
   opacity: .5;
 }
+/* Cinematic vignette + lens edge tint. */
+#ui::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 21;
+  background:
+    radial-gradient(ellipse at 50% 46%, transparent 48%, rgba(2,4,9,.22) 78%, rgba(1,2,6,.58) 100%),
+    linear-gradient(90deg, rgba(72,230,255,.035), transparent 18%, transparent 82%, rgba(255,62,157,.035));
+}
 
 .screen { position: absolute; inset: 0; display: none; pointer-events: auto; }
 .screen.active { display: flex; }

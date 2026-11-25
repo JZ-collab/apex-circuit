@@ -198,6 +198,38 @@ export const ui = {
         save.setNumber(e.target.value.replace(/[^a-z0-9]/gi, ''));
         this.onConfigChange?.();
       };
+    } else if (cat === 'custom') {
+      const model = save.customModel || { name: '', data: '' };
+      $('garage-options-list').innerHTML = `
+        <div class="opt on" style="flex-direction:column;align-items:flex-start;gap:12px;padding:18px">
+          <div class="opt-info"><b>IMPORT YOUR OWN 3D MODEL</b>
+          <small>Load a .glb / .gltf you made or downloaded. Auto-scaled and centered — paint, wheels, lights and liveries still apply. Max 2.5 MB.</small></div>
+          <input type="file" id="model-file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json" style="width:100%;font-size:12px;color:var(--text)">
+          <div class="opt-info"><b>${model.name ? 'FITTED: ' + model.name.replace(/</g, '&lt;') : 'NO MODEL IMPORTED'}</b>
+          <small>${model.data ? 'Your model is saved locally on this device.' : 'Without a model, YOUR MODEL falls back to the Kestrel Sedan.'}</small></div>
+          <button class="btn btn-small" id="btn-clear-model">REMOVE IMPORTED MODEL</button>
+        </div>`;
+      $('model-file').onchange = e => {
+        const file = e.target.files?.[0]; if (!file) return;
+        if (file.size > 2.5 * 1024 * 1024) { this.toast('MODEL TOO LARGE (MAX 2.5 MB)', true); e.target.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            save.setCustomModel(file.name, String(reader.result));
+            this.toast(`IMPORTED ${file.name}`);
+            this.renderGarage();
+            this.onConfigChange?.();
+          } catch { this.toast('COULD NOT SAVE MODEL', true); }
+        };
+        reader.onerror = () => this.toast('COULD NOT READ FILE', true);
+        reader.readAsDataURL(file);
+      };
+      $('btn-clear-model').onclick = () => {
+        save.clearCustomModel();
+        this.toast('IMPORTED MODEL REMOVED');
+        this.renderGarage();
+        this.onConfigChange?.();
+      };
     } else {
       $('garage-options-list').innerHTML = parts.map(p => {
         const owned = save.owns(cat, p.id);

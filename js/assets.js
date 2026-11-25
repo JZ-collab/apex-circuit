@@ -22,6 +22,34 @@ export async function cloneModel(file) {
   return scene.clone(true);
 }
 
+/** Load a user-imported model from a data URL, auto-oriented and scaled. */
+export function loadCustomModel(dataUrl) {
+  if (cache.has(dataUrl)) return cache.get(dataUrl).then(scene => scene.clone(true));
+  loader.setResourcePath(MODEL_BASE.href); // resolve external textures for bundled test models
+  const promise = new Promise((resolve, reject) => {
+    loader.load(dataUrl, gltf => resolve(gltf.scene), undefined, reject);
+  }).then(scene => {
+    // Normalize unknown community models: longest horizontal axis faces forward.
+    let box = new THREE.Box3().setFromObject(scene);
+    let size = box.getSize(new THREE.Vector3());
+    if (size.x > size.z) scene.rotation.y = Math.PI / 2;
+    scene.updateMatrixWorld(true);
+    box = new THREE.Box3().setFromObject(scene);
+    size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const scale = THREE.MathUtils.clamp(4.2 / Math.max(size.z, 0.1), 0.02, 30);
+    scene.scale.setScalar(scale);
+    scene.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+    scene.updateMatrixWorld(true);
+    return scene;
+  }).catch(err => {
+    cache.delete(dataUrl);
+    throw err;
+  }).finally(() => loader.setResourcePath(''));
+  cache.set(dataUrl, promise);
+  return promise.then(scene => scene.clone(true));
+}
+
 // Bounding box of an object, in the coordinate space of `relativeTo`.
 export function localBox(object, relativeTo) {
   object.updateWorldMatrix(true, true);

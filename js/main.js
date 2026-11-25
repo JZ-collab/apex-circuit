@@ -7,6 +7,13 @@ import { audio } from './audio.js';
 import { ui } from './ui.js';
 import { save } from './storage.js';
 import { Effects } from './effects.js';
+import { environment } from './env.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { TRACKS, RIVALS, REWARDS, WEATHER, DIFFICULTIES, findPart, computeSpecs } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -55,7 +62,47 @@ const showRings = [];
   const cyan = new THREE.PointLight(0x48e6ff, 65, 22, 2); cyan.position.set(-5, 2, -3);
   const pink = new THREE.PointLight(0xff3e9d, 50, 22, 2); pink.position.set(5, 2, 3);
   showroom.add(cyan, pink);
+  // Studio reflections on every painted surface.
+  showroom.environment = environment(renderer, {
+    top: 0x1c2c47, bottom: 0x0a1018, accent: 0x48e6ff, sun: 0xffffff,
+  });
+  // Cinematic top light and rim strips for the showroom turntable.
+  const top = new THREE.SpotLight(0xffffff, 140, 26, 0.62, 0.45, 1.6);
+  top.position.set(0, 12, 1); top.target.position.set(0, 0, 0);
+  showroom.add(top, top.target);
+  for (const sx of [-1, 1]) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.06, 7),
+      new THREE.MeshBasicMaterial({ color: sx < 0 ? 0x48e6ff : 0xff3e9d })
+    );
+    strip.position.set(sx * 5.2, 2.6, 0);
+    showroom.add(strip);
+  }
 }
+
+// ---------------------------------------------------------------- cinematic pipeline
+// Bloom + filmic tone mapping + FXAA gives the whole game a consistent,
+// high-end look: emissive lamps, boost flames and neon actually glow.
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(showroom, camera);
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.62, 0.62, 0.72);
+const outputPass = new OutputPass();
+const fxaa = new ShaderPass(FXAAShader);
+composer.addPass(renderPass);
+composer.addPass(bloom);
+composer.addPass(outputPass);
+composer.addPass(fxaa);
+function resizePipeline() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const dpr = renderer.getPixelRatio();
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  bloom.setSize(w, h);
+  fxaa.material.uniforms.resolution.value.set(1 / (w * dpr), 1 / (h * dpr));
+}
+resizePipeline();
 
 // ---------------------------------------------------------------- state
 let mode = 'loading';
@@ -69,12 +116,15 @@ const keys = {};
 let lastCountdown = null;
 let previewBusy = false;
 
-window.__apex = { get race() { return race; }, get mode() { return mode; } };
+window.__apex = { get race() { return race; }, get mode() { return mode; }, save };
 
 ui.init();
 ui.onStart = startRace;
 ui.onGarage = () => { if (mode !== 'menu') { clearRace(); mode = 'garage'; } };
-ui.onConfigChange = rebuildPreview;
+ui.onConfigChange = () => rebuildPreview().catch(err => {
+  console.error(err);
+  ui.toast('MODEL FAILED TO LOAD', true);
+});
 ui.onResume = () => { if (mode === 'pause') { mode = 'race'; ui.show('race'); } };
 ui.onRestart = () => startRace(race?.opts || {
   trackId: ui.selectedTrack, laps: ui.laps, rivals: ui.rivals,
@@ -174,6 +224,10 @@ async function startRace(opts) {
   const track = new Track(def);
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(def.fog);
+  scene.environment = environment(renderer, {
+    top: def.skyTop, bottom: def.skyBot, accent: def.accent,
+    sun: def.night ? 0xa9c6ff : 0xfff0dc, night: !!def.night,
+  });
   const near = Math.round(140 * weatherDef.fog);
   scene.fog = new THREE.Fog(def.fog, near, Math.round(540 * weatherDef.fog));
   scene.add(track.build(weatherDef));
@@ -269,11 +323,7 @@ canvas.addEventListener('pointermove', e => {
   dragX = e.clientX;
 });
 window.addEventListener('pointerup', () => dragging = false);
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+window.addEventListener('resize', resizePipeline);
 
 function playerInput() {
   const left = keys.KeyA || keys.ArrowLeft || ui.touch.left;
@@ -380,11 +430,13 @@ function frame() {
       });
       ui.minimap(r.track, r.cars.map(c => c.vehicle), r.player, r.ghostState);
     }
-    renderer.render(r.scene, camera);
+    renderPass.scene = r.scene;
+    composer.render(dt);
   } else {
     if (previewCar) previewCar.update(dt, { speed: 0, steer: 0, accel: 0 });
     updatePreviewCamera(dt);
-    renderer.render(showroom, camera);
+    renderPass.scene = showroom;
+    composer.render(dt);
   }
 }
 

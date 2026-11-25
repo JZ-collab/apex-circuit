@@ -13,6 +13,7 @@ const fresh = () => ({
   wins: 0,
   podiums: 0,
   distance: 0,
+  customModel: { name: '', data: '' },
 });
 
 let data = fresh();
@@ -42,6 +43,7 @@ export const save = {
   get credits() { return data.credits; },
   get setup() { return data.setup; },
   get settings() { return data.settings; },
+  get customModel() { return data.customModel || { name: '', data: '' }; },
 
   owns(category, id) {
     const partId = id == null ? data.setup[category] : id;
@@ -63,6 +65,17 @@ export const save = {
   set(category, id) { data.setup[category] = id; persist(); },
   setNumber(value) {
     data.setup.number = String(value || '07').replace(/[^a-z0-9]/gi, '').slice(0, 3).toUpperCase() || '07';
+    persist();
+  },
+  setCustomModel(name, dataUrl) {
+    data.customModel = { name: String(name).slice(0, 48), data: dataUrl };
+    data.setup.car = 'custom';
+    persist();
+    return true;
+  },
+  clearCustomModel() {
+    data.customModel = { name: '', data: '' };
+    if (data.setup.car === 'custom') data.setup.car = 'sedan';
     persist();
   },
   setSetting(key, value) { data.settings[key] = value; persist(); },

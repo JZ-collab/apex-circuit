@@ -338,13 +338,50 @@ export class Track {
     const sun = new THREE.DirectionalLight(night ? 0x8fa8ff : 0xfff0dc, night ? 0.85 : (weather?.id === 'fog' ? 1.3 : 2.1));
     sun.position.set(60, 110, -40);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.left = -60; sun.shadow.camera.right = 60;
-    sun.shadow.camera.top = 60; sun.shadow.camera.bottom = -60;
-    sun.shadow.camera.far = 300;
-    sun.shadow.bias = -0.0008;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.left = -75; sun.shadow.camera.right = 75;
+    sun.shadow.camera.top = 75; sun.shadow.camera.bottom = -75;
+    sun.shadow.camera.far = 320;
+    sun.shadow.bias = -0.0006;
+    sun.shadow.normalBias = 0.035;
     group.add(sun, sun.target);
     this.sun = sun;
+    // Opposing cool fill light keeps shadowed bodywork from going flat black.
+    const fill = new THREE.DirectionalLight(night ? 0x5470ff : 0x86b9ff, night ? 0.5 : 0.65);
+    fill.position.set(-70, 45, 60);
+    group.add(fill);
+    // Glowing sun/moon disc — picked up by the bloom pass.
+    const discCanvas = document.createElement('canvas');
+    discCanvas.width = discCanvas.height = 128;
+    const dctx = discCanvas.getContext('2d');
+    const dg = dctx.createRadialGradient(64, 64, 2, 64, 64, 64);
+    dg.addColorStop(0, 'rgba(255,255,255,1)');
+    dg.addColorStop(0.22, 'rgba(255,255,255,.85)');
+    dg.addColorStop(0.5, 'rgba(255,220,170,.22)');
+    dg.addColorStop(1, 'rgba(255,180,120,0)');
+    dctx.fillStyle = dg; dctx.fillRect(0, 0, 128, 128);
+    const discTex = new THREE.CanvasTexture(discCanvas);
+    discTex.colorSpace = THREE.SRGBColorSpace;
+    const disc = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: discTex, color: night ? 0xa9c6ff : 0xffd9a0,
+      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+    }));
+    disc.position.set(240, 230, -210);
+    disc.scale.setScalar(night ? 95 : 145);
+    group.add(disc);
+    if (night) {
+      const starGeo = new THREE.BufferGeometry();
+      const stars = [];
+      for (let i = 0; i < 900; i++) {
+        const a = Math.random() * Math.PI * 2, y = Math.random() * 0.85 + 0.12;
+        const r = 700, s = Math.sqrt(1 - y * y);
+        stars.push(Math.cos(a) * s * r, y * r, Math.sin(a) * s * r);
+      }
+      starGeo.setAttribute('position', new THREE.Float32BufferAttribute(stars, 3));
+      group.add(new THREE.Points(starGeo, new THREE.PointsMaterial({
+        color: 0xdcecff, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0.85, fog: false,
+      })));
+    }
     if (night) {
       for (const side of [-1, 1]) {
         const lamp = new THREE.PointLight(def.accent, 55, 70, 2);

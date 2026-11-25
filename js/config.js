@@ -1,6 +1,11 @@
 // Game data: cars, parts, events and race rules. Prices are in credits (CR).
 
 export const CAR_MODELS = [
+  // CREATOR SERIES — original, hand-built geometry authored for Apex Circuit.
+  { id: 'apex-gt',       name: 'APEX GT',       sub: 'Creator Series · grand tourer', model: null, original: 'apex-gt',    price: 52000, mass: 1120, drag: 0.29, grip: 1.20 },
+  { id: 'apex-rally',    name: 'APEX RALLY',    sub: 'Creator Series · rally beast',  model: null, original: 'apex-rally', price: 68000, mass: 1080, drag: 0.33, grip: 1.16 },
+  { id: 'apex-hyper',    name: 'APEX HYPER',    sub: 'Creator Series · hypercar',     model: null, original: 'apex-hyper', price: 94000, mass: 940,  drag: 0.24, grip: 1.36 },
+  { id: 'custom',        name: 'YOUR MODEL',    sub: 'Import your own .glb / .gltf',   model: null, custom: true,          price: 0,     mass: 1150, drag: 0.30, grip: 1.10 },
   { id: 'sedan',          name: 'KESTREL SEDAN',   sub: 'Everyday compact',        model: 'sedan.glb',          price: 0,     mass: 1240, drag: 0.34, grip: 1.00 },
   { id: 'kart-oobi',      name: 'OOBI KART',       sub: 'Featherweight fun',       model: 'kart-oobi.glb',      price: 4000,  mass: 460,  drag: 0.52, grip: 1.14 },
   { id: 'sedan-sports',   name: 'KESTREL GT',      sub: 'Sport sedan',             model: 'sedan-sports.glb',   price: 6500,  mass: 1170, drag: 0.32, grip: 1.08 },
@@ -191,6 +196,7 @@ export const TABS = [
   { id: 'underglow',    label: '13 / UNDERGLOW' },
   { id: 'tint',         label: '14 / WINDOW TINT' },
   { id: 'number',       label: '15 / RACE NUMBER' },
+  { id: 'custom',       label: '16 / YOUR MODEL' },
 ];
 
 export function findPart(category, id) {
