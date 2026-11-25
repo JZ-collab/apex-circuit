@@ -23,9 +23,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      - name: Package site
+        run: |
+          mkdir -p "$RUNNER_TEMP/site"
+          rsync -a --exclude='.git' --exclude='.github' --exclude='node_modules' --exclude='dist' ./ "$RUNNER_TEMP/site/"
+          tar -cf "$RUNNER_TEMP/artifact.tar" -C "$RUNNER_TEMP/site" .
+      - uses: actions/upload-artifact@v4
         with:
-          path: ./
+          name: github-pages
+          path: ${{ runner.temp }}/artifact.tar
+          retention-days: 1
           overwrite: true
       - id: deployment
         uses: actions/deploy-pages@v4
