@@ -23,6 +23,7 @@ var camera: Camera3D
 var player: RaceCar
 var rivals: Array[RaceCar] = []
 var stuck_timers: Array[float] = []
+var player_stuck := 0.0
 var state := "MENU"
 var selected_model := 0
 var selected_paint := 0
@@ -292,17 +293,19 @@ func back_to_menu() -> void:
 
 
 func place_grid() -> void:
-	var start: Vector3 = track.points[0]
 	var forward: Vector3 = track.tangents[0]
-	var right: Vector3 = track.rights[0]
 	# Grid sits just after the start line so the first crossing starts lap 1
 	# instead of instantly awarding lap 2.
-	player.reset_at(start + forward * 4.0 + right * -2.4, forward)
+	player.reset_at(track.grid_slot(0), forward)
 	for i in rivals.size():
-		var lane := -2.4 + float((i + 1) % 2) * 4.8
-		rivals[i].reset_at(start + forward * (9.0 + i * 5.0) + right * lane, forward)
+		rivals[i].reset_at(track.grid_slot(i + 1), forward)
 	for car in rivals:
 		car.visible = true
+	for car in [player] + rivals:
+		car.set_physics_process(true)
+	player_stuck = 0.0
+	for i in stuck_timers.size():
+		stuck_timers[i] = 0.0
 	last_progress = 0.0
 	lap = 1
 	race_time = 0.0
@@ -330,22 +333,31 @@ func _physics_process(delta: float) -> void:
 			update_rivals(delta)
 		update_race_state(delta)
 	elif state == "MENU" or state == "GARAGE":
-		player.drive(0.0, 1.0, 0.0, delta)
+		player.drive(0.0, 0.0, 0.0, delta)
 		for car in rivals:
-			car.drive(0.0, 1.0, 0.0, delta)
+			car.drive(0.0, 0.0, 0.0, delta)
 
 
 func update_player(delta: float) -> void:
 	if countdown > 0.0:
-		player.drive(0.0, 1.0, 0.0, delta)
+		player.drive(0.0, 0.0, 0.0, delta)
 		return
 	var throttle := Input.get_action_strength("accelerate")
 	var brake := Input.get_action_strength("brake")
 	if Input.is_action_just_pressed("nitro"):
 		player.nitro = maxf(player.nitro, 35.0)
-	# VehicleWheel3D positive steering turns left, so invert the arrow keys.
+	# The custom steering model treats positive as left.
 	var steer := Input.get_action_strength("left") - Input.get_action_strength("right")
 	player.drive(throttle, brake, steer, delta)
+	var idx: int = track.nearest_index(player.global_position)
+	var upside_down := player.global_transform.basis.y.dot(Vector3.UP) < 0.35
+	var off := (player.global_position - track.points[idx]).dot(track.rights[idx])
+	var fallen := player.global_position.y < track.points[idx].y - 6.0
+	var stranded := upside_down or fallen or absf(off) > track.half_width(idx) + 8.0
+	player_stuck = player_stuck + delta if stranded else 0.0
+	if player_stuck > 3.0:
+		player.reset_at(track.points[idx] + track.tangents[idx] * 2.0, track.tangents[idx])
+		player_stuck = 0.0
 	if Input.is_action_just_pressed("restart"):
 		place_grid()
 
@@ -354,34 +366,35 @@ func update_rivals(delta: float) -> void:
 	for i in rivals.size():
 		var car: RaceCar = rivals[i]
 		if countdown > 0.0:
-			car.drive(0.0, 1.0, 0.0, delta)
+			car.drive(0.0, 0.0, 0.0, delta)
 			continue
 		var idx: int = track.nearest_index(car.global_position)
-		var look: int = (idx + 16 + int(car.speed_kmh / 28.0)) % track.SAMPLES
-		var target: Vector3 = track.points[look] + track.rights[look] * (-2.0 + float(i % 2) * 4.0)
+		var look: int = track.index_ahead(idx, 12.0 + car.speed_kmh * 0.22)
+		var lane := -2.7 + float(i % 2) * 5.4
+		var target: Vector3 = track.points[look] + track.rights[look] * lane
 		var forward := -car.global_transform.basis.z
 		var to_target := (target - car.global_position).normalized()
 		var angle := forward.signed_angle_to(to_target, Vector3.UP)
-		var steer := clampf(angle / 0.45, -1.0, 1.0)
+		var steer := clampf(angle / 0.42, -1.0, 1.0)
 		# Use the track's own curvature instead of the car's heading: a spun
 		# car would otherwise see a 180° "corner" and brake forever.
-		var curve := track.tangents[idx].angle_to(track.tangents[(idx + 28) % track.SAMPLES])
-		var target_speed := clampf(175.0 - curve * 320.0 + float(i) * 6.0, 48.0, 172.0)
+		var curve := track.tangents[idx].angle_to(track.tangents[track.index_ahead(idx, 38.0)])
+		var target_speed := clampf(190.0 - curve * 165.0 + float(i) * 6.0, 55.0, 182.0)
 		var upside_down := car.global_transform.basis.y.dot(Vector3.UP) < 0.35
 		var off := (car.global_position - track.points[idx]).dot(track.rights[idx])
-		var struggling := upside_down or car.speed_kmh < 10.0 or absf(off) > 7.5
+		var fallen := car.global_position.y < track.points[idx].y - 6.0
+		var struggling := upside_down or fallen or car.speed_kmh < 9.0 or absf(off) > track.half_width(idx) + 6.0
 		if struggling:
 			stuck_timers[i] += delta
 		else:
 			stuck_timers[i] = 0.0
-		if stuck_timers[i] > 2.5:
-			var lane := -2.4 + float((i + 1) % 2) * 4.8
+		if stuck_timers[i] > 2.2:
 			car.reset_at(track.points[idx] + track.tangents[idx] * 2.0 + track.rights[idx] * lane, track.tangents[idx])
 			stuck_timers[i] = 0.0
-		if angle > 1.2:
-			target_speed = 80.0
-		var throttle := 1.0 if car.speed_kmh < target_speed else 0.15
-		var brake := 1.0 if car.speed_kmh > target_speed + 18.0 else 0.0
+		if absf(angle) > 1.2:
+			target_speed = 74.0
+		var throttle := 1.0 if car.speed_kmh < target_speed else 0.12
+		var brake := 1.0 if car.speed_kmh > target_speed + 16.0 else 0.0
 		car.drive(throttle, brake, steer, delta)
 
 
