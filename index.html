@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#05070d">
+<title>APEX CIRCUIT — Custom Car Racing</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2305070d'/%3E%3Cpath d='M12 44 30 14l22 30z' fill='none' stroke='%2348e6ff' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="ui">
+  <!-- LOADING -->
+  <section id="screen-loading" class="screen active">
+    <div class="loading-wrap">
+      <div class="logo-small">APEX<span>CIRCUIT</span></div>
+      <div class="loader"><i></i></div>
+      <p id="loading-text">Loading assets…</p>
+    </div>
+  </section>
+
+  <!-- MAIN MENU -->
+  <section id="screen-menu" class="screen">
+    <header class="topbar">
+      <div class="logo">APEX<span>CIRCUIT</span></div>
+      <div class="topbar-right">
+        <div class="credits"><span class="coin">◈</span> <b id="menu-credits">0</b> <small>CR</small></div>
+        <button class="icon-btn" id="btn-mute" title="Toggle sound (M)">♪</button>
+      </div>
+    </header>
+    <div class="menu-layout">
+      <div class="menu-main">
+        <div class="eyebrow">// BUILD. TUNE. RACE.</div>
+        <h1>OWN THE<br><em>APEX.</em></h1>
+        <p class="tagline">A browser racer with real car swaps, engine builds and a garage full of options. Runs anywhere with a browser.</p>
+        <div class="menu-actions">
+          <button class="btn btn-primary" id="btn-quick">QUICK RACE <span>→</span></button>
+          <button class="btn" id="btn-garage">GARAGE / TUNING</button>
+          <button class="btn btn-ghost" id="btn-help">HOW TO PLAY</button>
+        </div>
+        <div class="menu-stats" id="menu-stats"></div>
+      </div>
+      <div class="menu-side panel">
+        <div class="panel-title">SELECT EVENT</div>
+        <div id="track-list" class="track-list"></div>
+        <div class="field">
+          <label>LAPS</label>
+          <div class="segmented" id="lap-select">
+            <button data-laps="1">1</button>
+            <button data-laps="2" class="on">2</button>
+            <button data-laps="3">3</button>
+            <button data-laps="5">5</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>RIVALS</label>
+          <div class="segmented" id="rival-select">
+            <button data-rivals="0">0</button>
+            <button data-rivals="3">3</button>
+            <button data-rivals="5" class="on">5</button>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-wide" id="btn-race">START RACE <span>→</span></button>
+      </div>
+    </div>
+    <footer class="credits-footer">Car models: Kenney Car Kit (CC0) via OpenGameArt · Engine: Three.js (MIT)</footer>
+  </section>
+
+  <!-- GARAGE -->
+  <section id="screen-garage" class="screen">
+    <header class="topbar">
+      <button class="btn-back" id="btn-garage-back">← MENU</button>
+      <div class="topbar-right">
+        <div class="credits"><span class="coin">◈</span> <b id="garage-credits">0</b> <small>CR</small></div>
+        <button class="icon-btn" id="btn-mute-garage" title="Toggle sound (M)">♪</button>
+      </div>
+    </header>
+    <div class="garage-layout">
+      <aside class="garage-tabs" id="garage-tabs"></aside>
+      <div class="garage-options panel">
+        <div class="panel-title" id="garage-panel-title">BODY</div>
+        <div id="garage-options-list"></div>
+      </div>
+      <div class="garage-right">
+        <div class="spec-card panel">
+          <div class="panel-title">BUILD SPEC</div>
+          <div id="spec-list"></div>
+        </div>
+        <div class="garage-tip">Drag to orbit the car · Changes are saved automatically</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RACE HUD -->
+  <section id="screen-race" class="screen">
+    <div class="hud-top">
+      <div class="hud-block">
+        <span class="hud-label">LAP</span>
+        <span class="hud-value" id="hud-lap">1 / 2</span>
+      </div>
+      <div class="hud-block center">
+        <span class="hud-label">TIME</span>
+        <span class="hud-value big" id="hud-time">0:00.00</span>
+        <span class="hud-sub" id="hud-best">BEST —</span>
+      </div>
+      <div class="hud-block right">
+        <span class="hud-label">POS</span>
+        <span class="hud-value" id="hud-pos">1 / 6</span>
+      </div>
+    </div>
+
+    <div class="countdown" id="countdown"></div>
+
+    <div class="hud-bottom">
+      <div class="minimap-wrap"><canvas id="minimap" width="220" height="220"></canvas></div>
+      <div class="speedo">
+        <div class="gear" id="hud-gear">N</div>
+        <div class="speed"><span id="hud-speed">0</span><small>KM/H</small></div>
+        <div class="rpm-bar"><i id="rpm-fill"></i></div>
+        <div class="rpm-ticks"></div>
+      </div>
+      <div class="race-actions">
+        <button class="icon-btn" id="btn-camera" title="Camera (C)">◉</button>
+        <button class="icon-btn" id="btn-respawn" title="Respawn (R)">↻</button>
+        <button class="icon-btn" id="btn-pause" title="Pause (Esc)">Ⅱ</button>
+      </div>
+    </div>
+    <div class="touch-controls" id="touch-controls">
+      <div class="touch-left"><button data-key="left">◀</button><button data-key="right">▶</button></div>
+      <div class="touch-right"><button data-key="handbrake">DRIFT</button><button data-key="brake">BRAKE</button><button data-key="throttle">GAS</button></div>
+    </div>
+  </section>
+
+  <!-- PAUSE -->
+  <section id="screen-pause" class="screen overlay-screen">
+    <div class="modal panel">
+      <div class="eyebrow">// RACE PAUSED</div>
+      <h2>TAKE A BREATH.</h2>
+      <button class="btn btn-primary btn-wide" id="btn-resume">RESUME</button>
+      <button class="btn btn-wide" id="btn-restart">RESTART RACE</button>
+      <button class="btn btn-ghost btn-wide" id="btn-quit">QUIT TO MENU</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <section id="screen-results" class="screen overlay-screen">
+    <div class="modal panel wide">
+      <div class="eyebrow" id="results-eyebrow">// RACE COMPLETE</div>
+      <h2 id="results-title">FINISH LINE.</h2>
+      <table class="results-table"><thead><tr><th>POS</th><th>DRIVER</th><th>CAR</th><th>BEST LAP</th></tr></thead><tbody id="results-body"></tbody></table>
+      <div class="reward"><span>CR EARNED</span><b id="results-reward">+0</b></div>
+      <div class="result-actions">
+        <button class="btn btn-primary" id="btn-again">RACE AGAIN</button>
+        <button class="btn" id="btn-results-garage">GARAGE</button>
+        <button class="btn btn-ghost" id="btn-results-menu">MENU</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- HELP -->
+  <section id="screen-help" class="screen overlay-screen">
+    <div class="modal panel wide">
+      <div class="eyebrow">// DRIVER'S BRIEFING</div>
+      <h2>HOW TO PLAY.</h2>
+      <div class="help-grid">
+        <div><b>W / ↑</b><span>Throttle</span></div>
+        <div><b>S / ↓</b><span>Brake / reverse</span></div>
+        <div><b>A D / ← →</b><span>Steer</span></div>
+        <div><b>SPACE</b><span>Handbrake drift</span></div>
+        <div><b>C</b><span>Change camera</span></div>
+        <div><b>R</b><span>Respawn on track</span></div>
+        <div><b>P / ESC</b><span>Pause</span></div>
+        <div><b>M</b><span>Mute</span></div>
+      </div>
+      <p class="help-note">Earn credits by racing, then spend them in the Garage on engine swaps, drivetrain, gearboxes, tires, body kits, wheels, paint and more. Every part changes how the car drives.</p>
+      <button class="btn btn-primary btn-wide" id="btn-help-close">GOT IT</button>
+    </div>
+  </section>
+
+  <div id="toast"></div>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
