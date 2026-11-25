@@ -29,3 +29,6 @@ Third-party assets (not covered by the MIT license above):
   assets/models/KENNEY-LICENSE.txt.
 - vendor/three.module.js and vendor/GLTFLoader.js are from the Three.js
   project (https://threejs.org), MIT licensed.
+- The native desktop shell is packaged with Electron (https://electronjs.org),
+  MIT licensed. Electron is a build/runtime dependency and is not bundled in
+  the browser/GitHub Pages version.

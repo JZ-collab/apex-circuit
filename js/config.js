@@ -1,4 +1,4 @@
-// Game data: cars, parts and events. Prices are in credits (CR).
+// Game data: cars, parts, events and race rules. Prices are in credits (CR).
 
 export const CAR_MODELS = [
   { id: 'sedan',          name: 'KESTREL SEDAN',   sub: 'Everyday compact',        model: 'sedan.glb',          price: 0,     mass: 1240, drag: 0.34, grip: 1.00 },
@@ -98,21 +98,42 @@ export const TINTS = [
   { id: 't2', name: 'DARK',  sub: '65% tint',  value: 0.65, price: 1200 },
 ];
 
+export const NITRO = [
+  { id: 'none', name: 'NO BOOST',   sub: 'Natural aspiration only', price: 0,    power: 0,    capacity: 0,   regen: 0 },
+  { id: 'n1',   name: 'STREET NOS', sub: '+35% push · 4.5s bottle',  price: 3500, power: 0.35, capacity: 4.5, regen: 0.42 },
+  { id: 'n2',   name: 'RACE NOS',   sub: '+62% push · 6.5s bottle',  price: 9000, power: 0.62, capacity: 6.5, regen: 0.60 },
+];
+
 export const TRACKS = [
   {
-    id: 'sunset', name: 'SUNSET LOOP', sub: 'Fast flowing circuit', width: 17, laps: 2,
+    id: 'sunset', name: 'SUNSET LOOP', sub: 'Fast flowing circuit', width: 17, laps: 2, theme: 'coast',
     points: [[0,0],[62,-6],[112,-46],[118,-104],[72,-145],[8,-152],[-52,-130],[-88,-84],[-78,-32],[-40,14]],
     ground: 0x1b1b26, fog: 0x1a1524, skyTop: 0x1b1038, skyBot: 0xff7a4d, accent: 0xff7a4d,
   },
   {
-    id: 'industrial', name: 'INDUSTRIAL SPRINT', sub: 'Tight technical layout', width: 15, laps: 3,
+    id: 'industrial', name: 'INDUSTRIAL SPRINT', sub: 'Tight technical layout', width: 15, laps: 3, theme: 'city',
     points: [[0,0],[66,-4],[116,-38],[126,-92],[92,-124],[42,-106],[12,-72],[-26,-62],[-68,-90],[-112,-58],[-104,-8],[-50,18]],
     ground: 0x1c2026, fog: 0x141b22, skyTop: 0x0b1c2b, skyBot: 0x4b6b7a, accent: 0x48e6ff,
   },
   {
-    id: 'coastal', name: 'COASTAL RUN', sub: 'Long high-speed sweepers', width: 19, laps: 2,
+    id: 'coastal', name: 'COASTAL RUN', sub: 'Long high-speed sweepers', width: 19, laps: 2, theme: 'coast',
     points: [[0,0],[78,10],[150,-20],[192,-80],[172,-150],[104,-192],[22,-182],[-52,-152],[-124,-172],[-182,-122],[-192,-52],[-142,12],[-70,32]],
     ground: 0x17251f, fog: 0x10202a, skyTop: 0x123c55, skyBot: 0xffb06b, accent: 0x7ce8c0,
+  },
+  {
+    id: 'neon', name: 'NEON DISTRICT', sub: 'Midnight street circuit', width: 16, laps: 3, theme: 'neon', night: true,
+    points: [[0,0],[70,-8],[120,-45],[128,-105],[86,-140],[28,-132],[-18,-100],[-62,-118],[-108,-88],[-112,-32],[-62,16]],
+    ground: 0x0c0e18, fog: 0x090a14, skyTop: 0x04030f, skyBot: 0x2a0b3d, accent: 0xff3e9d,
+  },
+  {
+    id: 'alpine', name: 'ALPINE PASS', sub: 'Climbing hairpins', width: 16, laps: 2, theme: 'alpine',
+    points: [[0,0],[56,-20],[92,-70],[70,-120],[20,-146],[-30,-130],[-58,-92],[-96,-76],[-120,-28],[-84,18],[-30,34]],
+    ground: 0x1a2624, fog: 0x18303a, skyTop: 0x123f66, skyBot: 0xa9d7ea, accent: 0x7ce8c0,
+  },
+  {
+    id: 'desert', name: 'DUST DEVIL', sub: 'Wide-open desert sprint', width: 20, laps: 2, theme: 'desert',
+    points: [[0,0],[90,4],[170,-34],[214,-104],[186,-176],[110,-214],[22,-204],[-62,-176],[-142,-192],[-206,-142],[-210,-64],[-150,-8],[-72,26]],
+    ground: 0x3a2b1e, fog: 0x4a3324, skyTop: 0x2a1b40, skyBot: 0xffa354, accent: 0xffb06b,
   },
 ];
 
@@ -124,33 +145,52 @@ export const RIVALS = [
   { name: 'DUST', car: 'suv',              color: '#c6d0da', paint: 'p2', number: '88', skill: 0.89 },
 ];
 
+export const DIFFICULTIES = [
+  { id: 'rookie', name: 'ROOKIE', skill: 0.86, reward: 0.8 },
+  { id: 'pro',    name: 'PRO',    skill: 0.98, reward: 1.0 },
+  { id: 'ace',    name: 'ACE',    skill: 1.07, reward: 1.25 },
+  { id: 'legend', name: 'LEGEND', skill: 1.16, reward: 1.6 },
+];
+
+export const WEATHER = [
+  { id: 'dry', name: 'DRY',  grip: 1.00, fog: 1.00, rain: false },
+  { id: 'wet', name: 'WET',  grip: 0.82, fog: 0.68, rain: true },
+  { id: 'fog', name: 'FOG',  grip: 0.94, fog: 0.28, rain: false },
+];
+
+export const MODES = [
+  { id: 'race', name: 'GRID RACE', sub: 'Race rivals to the flag' },
+  { id: 'trial', name: 'TIME TRIAL', sub: 'Beat your ghost · no rivals' },
+];
+
 export const DEFAULT_SETUP = {
   car: 'sedan', engine: 'i4', transmission: 't5', drivetrain: 'fwd', tires: 'street',
-  suspension: 'stock', wheels: 'wheel-default', spoiler: 'none', bodyKit: 'stock',
+  suspension: 'stock', wheels: 'wheel-default', spoiler: 'none', bodyKit: 'stock', nitro: 'none',
   paint: 'p1', accent: 'a1', underglow: 'off', tint: 't0', number: '07',
 };
 
 export const CATALOG = {
   car: CAR_MODELS, engine: ENGINES, transmission: TRANSMISSIONS, drivetrain: DRIVETRAINS,
   tires: TIRES, suspension: SUSPENSIONS, wheels: WHEELS, spoiler: SPOILERS, bodyKit: BODY_KITS,
-  paint: PAINTS, accent: ACCENTS, underglow: UNDERGLOW, tint: TINTS,
+  nitro: NITRO, paint: PAINTS, accent: ACCENTS, underglow: UNDERGLOW, tint: TINTS,
 };
 
 export const TABS = [
-  { id: 'car',          label: '01 / BODY' },
+  { id: 'car',          label: '01 / CHASSIS' },
   { id: 'engine',       label: '02 / ENGINE' },
   { id: 'transmission', label: '03 / GEARBOX' },
-  { id: 'drivetrain',   label: '04 / DRIVE' },
-  { id: 'tires',        label: '05 / TIRES' },
-  { id: 'suspension',   label: '06 / SUSPENSION' },
-  { id: 'wheels',       label: '07 / WHEELS' },
-  { id: 'spoiler',      label: '08 / SPOILER' },
-  { id: 'bodyKit',      label: '09 / BODY KIT' },
-  { id: 'paint',        label: '10 / PAINT' },
-  { id: 'accent',       label: '11 / ACCENT' },
-  { id: 'underglow',    label: '12 / UNDERGLOW' },
-  { id: 'tint',         label: '13 / WINDOW TINT' },
-  { id: 'number',       label: '14 / RACE NUMBER' },
+  { id: 'drivetrain',   label: '04 / DRIVETRAIN' },
+  { id: 'nitro',        label: '05 / NITRO' },
+  { id: 'tires',        label: '06 / TIRES' },
+  { id: 'suspension',   label: '07 / SUSPENSION' },
+  { id: 'wheels',       label: '08 / WHEELS' },
+  { id: 'spoiler',      label: '09 / SPOILER' },
+  { id: 'bodyKit',      label: '10 / BODY KIT' },
+  { id: 'paint',        label: '11 / PAINT' },
+  { id: 'accent',       label: '12 / ACCENT' },
+  { id: 'underglow',    label: '13 / UNDERGLOW' },
+  { id: 'tint',         label: '14 / WINDOW TINT' },
+  { id: 'number',       label: '15 / RACE NUMBER' },
 ];
 
 export function findPart(category, id) {
@@ -165,20 +205,22 @@ export function computeSpecs(setup) {
   const tires = findPart('tires', setup.tires);
   const susp = findPart('suspension', setup.suspension);
   const spoiler = findPart('spoiler', setup.spoiler);
+  const nitro = findPart('nitro', setup.nitro);
 
-  const mass = car.mass + engine.mass;
+  const mass = car.mass + engine.mass + (nitro.id === 'none' ? 0 : 35);
   const powerToWeight = engine.hp * 1000 / mass;
-  const topSpeed = (26 + Math.sqrt(engine.hp) * 1.72) * (0.94 + trans.ratios.at(-1) * 0.08);
-  const quarter = 15.5 - Math.min(powerToWeight * 0.014, 7.4);
+  const topSpeed = (26 + Math.sqrt(engine.hp) * 1.72) * (0.94 + trans.ratios.at(-1) * 0.08) * (1 + nitro.power * 0.18);
+  const quarter = 15.5 - Math.min(powerToWeight * 0.014, 7.4) - nitro.power * 1.1;
   const grip = car.grip * tires.grip * susp.handling * drive.traction * (spoiler.id === 'wing' ? 1.06 : 1);
   const handling = grip * 0.86 + (1 / (1 + mass / 2600)) * 0.34;
   return {
-    hp: engine.hp, mass, topSpeed, quarter: Math.max(quarter, 7.1),
+    hp: engine.hp, mass, topSpeed, quarter: Math.max(quarter, 6.2),
     grip, handling, redline: engine.redline, torque: engine.torque,
     resp: engine.resp, drag: car.drag, accel: drive.accel, oversteer: drive.oversteer,
     slip: tires.slip, shift: trans.shift, ratios: trans.ratios, final: trans.final,
     ride: susp.ride, drive: drive.id,
+    boost: nitro.power, boostCap: nitro.capacity, boostRegen: nitro.regen,
   };
 }
 
-export const REWARDS = [5500, 3600, 2400, 1500, 1100, 800];
+export const REWARDS = [6500, 4200, 2900, 2000, 1500, 1100];

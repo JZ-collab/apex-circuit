@@ -3,19 +3,21 @@ import * as THREE from 'three';
 const clamp = THREE.MathUtils.clamp;
 const WHEEL_RADIUS = 0.32;
 
-/** Arcade vehicle dynamics shared by the player and every rival. */
+/** Arcade vehicle dynamics shared by the player, rivals and the ghost. */
 export class Vehicle {
-  constructor(specs, track, { x, z, heading, name = 'YOU', color = '#48e6ff' } = {}) {
+  constructor(specs, track, { x, z, heading, name = 'YOU', color = '#48e6ff', grip = 1 } = {}) {
     this.specs = specs;
     this.track = track;
     this.name = name;
     this.color = color;
+    this.weatherGrip = grip;
     this.x = x; this.z = z;
     this.heading = heading;
     this.vx = 0; this.vz = 0;
     this.speed = 0;
     this.steer = 0;
     this.accel = 0;
+    this.brake = 0;
     this.slip = 0;
     this.gear = 1;
     this.rpm = 900;
@@ -30,6 +32,11 @@ export class Vehicle {
     this.lapStart = 0;
     this.offTrack = false;
     this.hit = 0;
+    this.hitCooldown = 0;
+    this.impact = 0;
+    this.damage = 0;
+    this.boostCharge = 0;
+    this.boosting = false;
     this.reverse = false;
   }
 
@@ -41,6 +48,12 @@ export class Vehicle {
     const brake = clamp(input.brake || 0, 0, 1);
     const steerInput = clamp(input.steer || 0, -1, 1);
     const handbrake = !!input.handbrake;
+    this.brake = brake;
+
+    // --- boost -------------------------------------------------------------
+    this.boosting = !!input.boost && this.boostCharge > 0.01 && s.boost > 0 && throttle > 0.1;
+    if (this.boosting) this.boostCharge = Math.max(0, this.boostCharge - dt);
+    else this.boostCharge = Math.min(s.boostCap, this.boostCharge + s.boostRegen * dt);
 
     // --- gearbox -----------------------------------------------------------
     this.shiftTimer = Math.max(0, this.shiftTimer - dt);
@@ -68,24 +81,25 @@ export class Vehicle {
     // --- longitudinal force ------------------------------------------------
     let fx = Math.sin(this.heading), fz = Math.cos(this.heading);
     let vLong = this.vx * fx + this.vz * fz;
-    const grip = s.grip * (this.offTrack ? 0.72 : 1);
+    const grip = s.grip * this.weatherGrip * (this.offTrack ? 0.72 : 1) * (1 - this.damage * 0.28);
+    const condition = 1 - this.damage * 0.34;
     let engineForce = 0;
     if (this.shiftTimer <= 0 && throttle > 0) {
       const ratio = this.reverse ? 3.4 : s.ratios[Math.min(this.gear - 1, s.ratios.length - 1)] * s.final;
       const gearFactor = ratio / 3.4;
-      engineForce = s.hp * 42 * throttle * gearFactor * s.resp * s.accel;
+      engineForce = s.hp * 42 * throttle * gearFactor * s.resp * s.accel * condition;
+      if (this.boosting) engineForce *= 1 + s.boost;
       const tractionCap = 9.81 * grip * (s.drive === 'awd' ? 1.65 : 1.35) * (s.mass + 200);
       engineForce = Math.min(engineForce, tractionCap);
-      const top = this.reverse ? 9 : s.topSpeed;
+      const top = this.reverse ? 9 : s.topSpeed * (this.boosting ? 1 + s.boost * 0.18 : 1);
       engineForce *= Math.max(0, 1 - Math.max(0, vLong) / top);
     }
     const dragForce = s.drag * 1.4 * vLong * Math.abs(vLong) + 45 * vLong;
     const brakeForce = brake * 17 * grip * (s.mass + 200);
     let acc = (engineForce - dragForce - brakeForce) / (s.mass + 200);
-    acc = clamp(acc, -24, 20);
+    acc = clamp(acc, -24, 30);
     this.accel = acc;
     vLong += acc * dt;
-
     if (this.reverse) vLong = clamp(vLong, -9, 0.5);
 
     // Rebuild world velocity from the old frame.
@@ -106,7 +120,7 @@ export class Vehicle {
     rx = fz; rz = -fx;
     let lat = vx * rx + vz * rz;
     let lon = vx * fx + vz * fz;
-    const gripLat = 7.6 * s.grip * s.slip * (handbrake ? 0.2 : 1) * (this.offTrack ? 0.65 : 1);
+    const gripLat = 7.6 * grip * s.slip * (handbrake ? 0.2 : 1) * (this.offTrack ? 0.65 : 1);
     lat *= Math.exp(-gripLat * dt);
     this.slip = Math.abs(lat);
     vx = fx * lon + rx * lat;
@@ -131,12 +145,20 @@ export class Vehicle {
       const sign = near.lateral >= 0 ? 1 : -1;
       this.x -= rightX * over * sign;
       this.z -= rightZ * over * sign;
+      const severity = clamp(absSpeed / 26, 0.08, 1);
       this.vx *= 0.55; this.vz *= 0.55;
       this.speed *= 0.55;
-      this.hit = Math.min(1, this.hit + 0.35);
-      this.onHit?.();
+      this.hit = Math.min(1, this.hit + 0.4);
+      if (this.hitCooldown <= 0) {
+        this.damage = Math.min(1, this.damage + severity * 0.11);
+        this.impact = severity;
+        this.hitCooldown = 0.45;
+        this.onHit?.(severity);
+      }
     }
     this.hit = Math.max(0, this.hit - dt * 1.4);
+    this.hitCooldown = Math.max(0, this.hitCooldown - dt);
+    this.impact = Math.max(0, this.impact - dt * 2.2);
 
     // --- lap progress ------------------------------------------------------
     const d = near.sample.dist;
@@ -164,6 +186,8 @@ export class Vehicle {
     this.vx = this.vz = this.speed = 0;
     this.reverse = false;
     this.gear = 1;
+    this.hit = 0;
+    this.boostCharge = Math.max(this.boostCharge, this.specs.boostCap * 0.25);
   }
 
   placeAtDistance(distance, lateral = 0) {

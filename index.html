@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#05070d">
-<title>APEX CIRCUIT — Custom Car Racing</title>
+<meta name="description" content="APEX CIRCUIT — build, tune and race. A cross-platform 3D racing game.">
+<title>APEX CIRCUIT — Build. Tune. Race.</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2305070d'/%3E%3Cpath d='M12 44 30 14l22 30z' fill='none' stroke='%2348e6ff' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="./assets/icon.png">
+<link rel="manifest" href="./manifest.webmanifest">
 <link rel="stylesheet" href="./css/style.css">
 <script type="importmap">
 {
@@ -23,7 +26,7 @@
   <!-- LOADING -->
   <section id="screen-loading" class="screen active">
     <div class="loading-wrap">
-      <div class="logo-small">APEX<span>CIRCUIT</span></div>
+      <div class="logo-small">APEX<span>CIRCUIT</span><sup>v2</sup></div>
       <div class="loader"><i></i></div>
       <p id="loading-text">Loading assets…</p>
     </div>
@@ -32,7 +35,7 @@
   <!-- MAIN MENU -->
   <section id="screen-menu" class="screen">
     <header class="topbar">
-      <div class="logo">APEX<span>CIRCUIT</span></div>
+      <div class="logo">APEX<span>CIRCUIT</span><sup>v2</sup></div>
       <div class="topbar-right">
         <div class="credits"><span class="coin">◈</span> <b id="menu-credits">0</b> <small>CR</small></div>
         <button class="icon-btn" id="btn-mute" title="Toggle sound (M)">♪</button>
@@ -40,9 +43,9 @@
     </header>
     <div class="menu-layout">
       <div class="menu-main">
-        <div class="eyebrow">// BUILD. TUNE. RACE.</div>
+        <div class="eyebrow">// BUILD. TUNE. OWN THE APEX.</div>
         <h1>OWN THE<br><em>APEX.</em></h1>
-        <p class="tagline">A browser racer with real car swaps, engine builds and a garage full of options. Runs anywhere with a browser.</p>
+        <p class="tagline">Six circuits. Full engine swaps, nitro kits, weather and ghost racing. Every part changes how the car drives — on Mac, Windows, Linux or Chromebook.</p>
         <div class="menu-actions">
           <button class="btn btn-primary" id="btn-quick">QUICK RACE <span>→</span></button>
           <button class="btn" id="btn-garage">GARAGE / TUNING</button>
@@ -51,29 +54,51 @@
         <div class="menu-stats" id="menu-stats"></div>
       </div>
       <div class="menu-side panel">
-        <div class="panel-title">SELECT EVENT</div>
-        <div id="track-list" class="track-list"></div>
+        <div class="panel-title">RACE SETUP</div>
         <div class="field">
-          <label>LAPS</label>
+          <label>EVENT TYPE</label>
+          <div class="segmented labeled" id="mode-select">
+            <button data-mode="race" class="on">GRID RACE</button>
+            <button data-mode="trial">TIME TRIAL</button>
+          </div>
+        </div>
+        <div class="track-list-wrap">
+          <label class="list-label">CIRCUIT</label>
+          <div id="track-list" class="track-list"></div>
+        </div>
+        <div class="field dual">
+          <div><label>LAPS</label>
           <div class="segmented" id="lap-select">
-            <button data-laps="1">1</button>
-            <button data-laps="2" class="on">2</button>
-            <button data-laps="3">3</button>
-            <button data-laps="5">5</button>
+            <button data-laps="1">1</button><button data-laps="2" class="on">2</button>
+            <button data-laps="3">3</button><button data-laps="5">5</button>
+          </div></div>
+          <div><label>RIVALS</label>
+          <div class="segmented" id="rival-select">
+            <button data-rivals="0">0</button><button data-rivals="3">3</button>
+            <button data-rivals="5" class="on">5</button>
+          </div></div>
+        </div>
+        <div class="field">
+          <label>WEATHER</label>
+          <div class="segmented" id="weather-select">
+            <button data-weather="dry" class="on">DRY</button>
+            <button data-weather="wet">WET</button>
+            <button data-weather="fog">FOG</button>
           </div>
         </div>
         <div class="field">
-          <label>RIVALS</label>
-          <div class="segmented" id="rival-select">
-            <button data-rivals="0">0</button>
-            <button data-rivals="3">3</button>
-            <button data-rivals="5" class="on">5</button>
+          <label>DIFFICULTY</label>
+          <div class="segmented" id="difficulty-select">
+            <button data-difficulty="rookie">ROOKIE</button>
+            <button data-difficulty="pro" class="on">PRO</button>
+            <button data-difficulty="ace">ACE</button>
+            <button data-difficulty="legend">LEGEND</button>
           </div>
         </div>
-        <button class="btn btn-primary btn-wide" id="btn-race">START RACE <span>→</span></button>
+        <button class="btn btn-primary btn-wide" id="btn-race">START SESSION <span>→</span></button>
       </div>
     </div>
-    <footer class="credits-footer">Car models: Kenney Car Kit (CC0) via OpenGameArt · Engine: Three.js (MIT)</footer>
+    <footer class="credits-footer">Car models: Kenney Car Kit (CC0) · Engine: Three.js (MIT) · v2.0 desktop + browser build</footer>
   </section>
 
   <!-- GARAGE -->
@@ -81,6 +106,7 @@
     <header class="topbar">
       <button class="btn-back" id="btn-garage-back">← MENU</button>
       <div class="topbar-right">
+        <button class="btn btn-small" id="btn-shuffle">SHUFFLE LIVERY</button>
         <div class="credits"><span class="coin">◈</span> <b id="garage-credits">0</b> <small>CR</small></div>
         <button class="icon-btn" id="btn-mute-garage" title="Toggle sound (M)">♪</button>
       </div>
@@ -93,10 +119,10 @@
       </div>
       <div class="garage-right">
         <div class="spec-card panel">
-          <div class="panel-title">BUILD SPEC</div>
+          <div class="panel-title">LIVE BUILD SPEC</div>
           <div id="spec-list"></div>
         </div>
-        <div class="garage-tip">Drag to orbit the car · Changes are saved automatically</div>
+        <div class="garage-tip">Drag the car to orbit · Changes save automatically</div>
       </div>
     </div>
   </section>
@@ -107,6 +133,7 @@
       <div class="hud-block">
         <span class="hud-label">LAP</span>
         <span class="hud-value" id="hud-lap">1 / 2</span>
+        <span class="hud-sub" id="hud-mode">GRID RACE</span>
       </div>
       <div class="hud-block center">
         <span class="hud-label">TIME</span>
@@ -116,10 +143,12 @@
       <div class="hud-block right">
         <span class="hud-label">POS</span>
         <span class="hud-value" id="hud-pos">1 / 6</span>
+        <span class="hud-sub" id="hud-weather">DRY</span>
       </div>
     </div>
 
     <div class="countdown" id="countdown"></div>
+    <div class="ghost-delta" id="hud-delta"></div>
 
     <div class="hud-bottom">
       <div class="minimap-wrap"><canvas id="minimap" width="220" height="220"></canvas></div>
@@ -128,6 +157,10 @@
         <div class="speed"><span id="hud-speed">0</span><small>KM/H</small></div>
         <div class="rpm-bar"><i id="rpm-fill"></i></div>
         <div class="rpm-ticks"></div>
+        <div class="meters">
+          <div class="meter"><small>NOS</small><span class="boost-bar"><i id="boost-fill"></i></span></div>
+          <div class="meter"><small>CAR</small><span class="damage-bar"><i id="damage-fill"></i></span></div>
+        </div>
       </div>
       <div class="race-actions">
         <button class="icon-btn" id="btn-camera" title="Camera (C)">◉</button>
@@ -137,7 +170,7 @@
     </div>
     <div class="touch-controls" id="touch-controls">
       <div class="touch-left"><button data-key="left">◀</button><button data-key="right">▶</button></div>
-      <div class="touch-right"><button data-key="handbrake">DRIFT</button><button data-key="brake">BRAKE</button><button data-key="throttle">GAS</button></div>
+      <div class="touch-right"><button data-key="boost">NOS</button><button data-key="handbrake">DRIFT</button><button data-key="brake">BRAKE</button><button data-key="throttle">GAS</button></div>
     </div>
   </section>
 
@@ -147,7 +180,7 @@
       <div class="eyebrow">// RACE PAUSED</div>
       <h2>TAKE A BREATH.</h2>
       <button class="btn btn-primary btn-wide" id="btn-resume">RESUME</button>
-      <button class="btn btn-wide" id="btn-restart">RESTART RACE</button>
+      <button class="btn btn-wide" id="btn-restart">RESTART SESSION</button>
       <button class="btn btn-ghost btn-wide" id="btn-quit">QUIT TO MENU</button>
     </div>
   </section>
@@ -155,8 +188,12 @@
   <!-- RESULTS -->
   <section id="screen-results" class="screen overlay-screen">
     <div class="modal panel wide">
-      <div class="eyebrow" id="results-eyebrow">// RACE COMPLETE</div>
+      <div class="eyebrow" id="results-eyebrow">// SESSION COMPLETE</div>
       <h2 id="results-title">FINISH LINE.</h2>
+      <div class="result-highlight">
+        <div><small>BEST LAP</small><b id="results-best">—</b></div>
+        <div><small>GHOST DELTA</small><b id="results-delta">—</b></div>
+      </div>
       <table class="results-table"><thead><tr><th>POS</th><th>DRIVER</th><th>CAR</th><th>BEST LAP</th></tr></thead><tbody id="results-body"></tbody></table>
       <div class="reward"><span>CR EARNED</span><b id="results-reward">+0</b></div>
       <div class="result-actions">
@@ -177,13 +214,16 @@
         <div><b>S / ↓</b><span>Brake / reverse</span></div>
         <div><b>A D / ← →</b><span>Steer</span></div>
         <div><b>SPACE</b><span>Handbrake drift</span></div>
+        <div><b>SHIFT</b><span>Nitro boost (if fitted)</span></div>
         <div><b>C</b><span>Change camera</span></div>
         <div><b>R</b><span>Respawn on track</span></div>
-        <div><b>P / ESC</b><span>Pause</span></div>
-        <div><b>M</b><span>Mute</span></div>
+        <div><b>P / ESC</b><span>Pause · M mutes</span></div>
       </div>
-      <p class="help-note">Earn credits by racing, then spend them in the Garage on engine swaps, drivetrain, gearboxes, tires, body kits, wheels, paint and more. Every part changes how the car drives.</p>
-      <button class="btn btn-primary btn-wide" id="btn-help-close">GOT IT</button>
+      <p class="help-note">Earn credits by racing, then spend them in the Garage on engine swaps, nitro, drivetrain, gearboxes, tires, body kits, wheels and paint. Time Trial saves your best run as a ghost car. Wet races cut grip; fog cuts visibility. Difficulty changes rival pace and rewards.</p>
+      <div class="help-actions">
+        <button class="btn btn-primary" id="btn-help-close">GOT IT</button>
+        <button class="btn btn-ghost" id="btn-reset">RESET PROGRESS</button>
+      </div>
     </div>
   </section>
 

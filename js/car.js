@@ -52,7 +52,7 @@ function box(w, h, d, color, opts = {}) {
  * Build a fully customized car.
  * Returns { group, specs, update(dt, driveState), dispose() }.
  */
-export async function createCar(setup, { isPlayer = false } = {}) {
+export async function createCar(setup, { isPlayer = false, ghost = false } = {}) {
   const specs = computeSpecs(setup);
   const modelDef = findPart('car', setup.car);
   const wheelDef = findPart('wheels', setup.wheels);
@@ -86,6 +86,7 @@ export async function createCar(setup, { isPlayer = false } = {}) {
   }
 
   // Paint: cloned materials so rival cars don't share the player's color.
+  const bodyMats = [];
   body.traverse(o => {
     if (!o.isMesh || !o.visible) return;
     o.geometry = o.geometry.clone();
@@ -95,6 +96,7 @@ export async function createCar(setup, { isPlayer = false } = {}) {
     o.material.roughness = 0.32;
     o.castShadow = true;
     o.receiveShadow = true;
+    bodyMats.push({ mat: o.material, base: o.material.color.clone() });
   });
   body.position.y += specs.ride;
   body.updateWorldMatrix(true, true);
@@ -208,6 +210,27 @@ export async function createCar(setup, { isPlayer = false } = {}) {
   number.position.set(halfW * 0.58, top * 0.735, length * 0.2);
   root.add(number);
 
+  // Brake lamps and nitro flames.
+  const brakeMats = [];
+  const flames = [];
+  const rearZ = bodyBox.min.z - 0.05;
+  for (const sx of [-1, 1]) {
+    const lampMat = new THREE.MeshBasicMaterial({ color: 0x62121e });
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.1, 0.06), lampMat);
+    lamp.position.set(sx * halfW * 0.56, top * 0.5, rearZ);
+    root.add(lamp);
+    brakeMats.push(lampMat);
+
+    const flame = new THREE.Mesh(
+      new THREE.ConeGeometry(0.14, 0.8, 8),
+      new THREE.MeshBasicMaterial({ color: 0x7deaff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+    );
+    flame.rotation.x = -Math.PI / 2;
+    flame.position.set(sx * halfW * 0.42, 0.36, rearZ - 0.34);
+    root.add(flame);
+    flames.push(flame);
+  }
+
   // Underglow.
   let glowMeshes = [];
   if (glow) {
@@ -226,7 +249,25 @@ export async function createCar(setup, { isPlayer = false } = {}) {
     }
   }
 
+  // Ghost replay car: translucent, glowing, no lights or shadow.
+  if (ghost) {
+    root.traverse(o => {
+      if (o.isLight) { o.intensity = 0; return; }
+      if (!o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) {
+        m.transparent = true;
+        m.opacity = 0.26;
+        m.depthWrite = false;
+        if (m.emissive) { m.emissive = new THREE.Color(accent); m.emissiveIntensity = 0.8; }
+      }
+      o.castShadow = false;
+    });
+    glowMeshes = [];
+  }
+
   let spinAngle = 0;
+  const damageColor = new THREE.Color(0x33221c);
 
   function update(dt, state = {}) {
     const speed = state.speed || 0;
@@ -238,6 +279,27 @@ export async function createCar(setup, { isPlayer = false } = {}) {
     body.rotation.z = THREE.MathUtils.lerp(body.rotation.z, -steer * Math.min(speed * 0.0016, 0.055), 0.12);
     body.rotation.x = THREE.MathUtils.lerp(body.rotation.x, -(state.accel || 0) * 0.008, 0.1);
     if (glowMeshes.length) glowMeshes[0].material.opacity = 0.62 + Math.sin(performance.now() * 0.004) * 0.12;
+
+    // Brake lamps.
+    const bright = state.brake ? 0xff2838 : 0x62121e;
+    for (const m of brakeMats) m.color.setHex(bright);
+
+    // Nitro flames flicker while boosting.
+    for (let i = 0; i < flames.length; i++) {
+      const f = flames[i];
+      if (state.boost && !ghost) {
+        f.material.opacity = 0.55 + Math.random() * 0.4;
+        f.scale.y = 0.7 + Math.random() * 0.75;
+        f.material.color.setHex(Math.random() > 0.5 ? 0x7deaff : 0xffa24a);
+      } else {
+        f.material.opacity = Math.max(0, f.material.opacity - dt * 4);
+      }
+    }
+
+    // Collision damage darkens and dirties the paint.
+    if (state.damage) {
+      for (const { mat, base } of bodyMats) mat.color.copy(base).lerp(damageColor, Math.min(state.damage * 0.6, 0.6));
+    }
   }
 
   function dispose() {

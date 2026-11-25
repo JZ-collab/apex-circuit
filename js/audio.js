@@ -49,20 +49,33 @@ class GameAudio {
     this.skidGain = ctx.createGain();
     this.skidGain.gain.value = 0;
     this.noise.connect(this.skidFilter).connect(this.skidGain).connect(this.master);
+
+    // Boost hiss on the same noise source.
+    this.boostFilter = ctx.createBiquadFilter();
+    this.boostFilter.type = 'bandpass';
+    this.boostFilter.frequency.value = 3200;
+    this.boostFilter.Q.value = 0.7;
+    this.boostGain = ctx.createGain();
+    this.boostGain.gain.value = 0;
+    this.noise.connect(this.boostFilter).connect(this.boostGain).connect(this.master);
     this.noise.start();
     this.ready = true;
   }
 
-  setEngine(rpm, throttle, slip, active) {
+  setEngine(rpm, throttle, slip, active, boost = false) {
     if (!this.ready) return;
     const now = this.ctx.currentTime;
-    const freq = 32 + Math.max(rpm, 700) / 60 * 2.2;
+    const freq = 32 + Math.max(rpm, 700) / 60 * (boost ? 2.9 : 2.2);
     this.oscA.frequency.setTargetAtTime(freq, now, 0.04);
     this.oscB.frequency.setTargetAtTime(freq * 1.005, now, 0.04);
-    this.engineFilter.frequency.setTargetAtTime(420 + throttle * 1500 + rpm * 0.08, now, 0.06);
+    this.engineFilter.frequency.setTargetAtTime(420 + throttle * 1500 + rpm * 0.08 + (boost ? 900 : 0), now, 0.06);
     this.engineGain.gain.setTargetAtTime(active ? 0.11 + throttle * 0.16 : 0, now, 0.08);
     this.skidGain.gain.setTargetAtTime(active ? Math.min(slip * 0.015, 0.22) : 0, now, 0.05);
+    this.boostGain.gain.setTargetAtTime(active && boost ? 0.13 : 0, now, 0.05);
   }
+
+  click() { this.beep(720, 0.045, 0.12, 'triangle'); }
+  boostStart() { this.beep(240, 0.22, 0.2, 'sawtooth'); }
 
   beep(freq = 660, duration = 0.16, volume = 0.25, type = 'square') {
     if (!this.ready || this.muted) return;

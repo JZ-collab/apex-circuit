@@ -1,0 +1,16 @@
+{
+  "name": "APEX CIRCUIT — Build. Tune. Race.",
+  "short_name": "APEX CIRCUIT",
+  "description": "Cross-platform 3D racing with deep car customization, nitro, weather and ghost racing.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#05070d",
+  "theme_color": "#05070d",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "./assets/icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./assets/icon-source.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+  ]
+}

@@ -85,7 +85,7 @@ export class Track {
     return Math.abs(diff);
   }
 
-  build() {
+  build(weather = null) {
     const group = new THREE.Group();
     this.group = group;
     const def = this.def;
@@ -120,7 +120,11 @@ export class Track {
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    const road = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x262b36, roughness: 0.92, metalness: 0.05, side: THREE.DoubleSide }));
+    const wet = weather?.id === 'wet';
+    const road = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      color: wet ? 0x171c25 : 0x262b36, roughness: wet ? 0.32 : 0.92,
+      metalness: wet ? 0.35 : 0.05, side: THREE.DoubleSide,
+    }));
     road.receiveShadow = true;
     group.add(road);
 
@@ -192,33 +196,128 @@ export class Track {
     finish.position.set(start.x, 0.03, start.z);
     group.add(finish);
 
-    // Scenery: trees and cones, kept clear of the racing surface.
-    const treeGeo = new THREE.ConeGeometry(2.2, 7, 7);
-    const treeMat = new THREE.MeshStandardMaterial({ color: 0x1e5c42, roughness: 1, flatShading: true });
-    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.4, 2, 6);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3a2b20, roughness: 1 });
-    const trees = new THREE.InstancedMesh(treeGeo, treeMat, 90);
-    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, 90);
-    let placed = 0, attempts = 0;
-    while (placed < 90 && attempts++ < 1600) {
-      const x = (Math.random() - 0.5) * 620;
-      const z = (Math.random() - 0.5) * 620;
-      if (this.nearest(x, z).dist < half + 12) continue;
-      const scale = 0.7 + Math.random() * 0.9;
-      dummy.position.set(x, 4.2 * scale, z);
-      dummy.rotation.set(0, Math.random() * 6.28, 0);
-      dummy.scale.setScalar(scale);
-      dummy.updateMatrix();
-      trees.setMatrixAt(placed, dummy.matrix);
-      dummy.position.set(x, 1 * scale, z);
-      dummy.scale.setScalar(scale);
-      dummy.updateMatrix();
-      trunks.setMatrixAt(placed, dummy.matrix);
-      placed++;
+    // Start gantry.
+    const gantryMat = new THREE.MeshStandardMaterial({ color: 0x111722, metalness: 0.7, roughness: 0.35 });
+    const gantryGlow = new THREE.MeshBasicMaterial({ color: def.accent });
+    for (const side of [-1, 1]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6, 0.5), gantryMat);
+      post.position.set(start.x + start.tz * (half + 1.4) * side, 3, start.z - start.tx * (half + 1.4) * side);
+      post.castShadow = true;
+      group.add(post);
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 5.2, 0.12), gantryGlow);
+      strip.position.copy(post.position); strip.position.y = 3;
+      strip.position.x += start.tz * 0.28 * side;
+      strip.position.z -= start.tx * 0.28 * side;
+      group.add(strip);
     }
-    trees.count = trunks.count = placed;
-    trees.castShadow = true;
-    group.add(trees, trunks);
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(this.width + 3.5, 0.65, 0.55), gantryMat);
+    beam.position.set(start.x, 6.1, start.z);
+    beam.rotation.y = start.angle;
+    group.add(beam);
+    const beamGlow = new THREE.Mesh(new THREE.BoxGeometry(this.width + 2.6, 0.12, 0.62), gantryGlow);
+    beamGlow.position.set(start.x, 5.72, start.z);
+    beamGlow.rotation.y = start.angle;
+    group.add(beamGlow);
+
+    // Theme-specific scenery, always kept clear of the racing surface.
+    const theme = def.theme || 'coast';
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const spot = (clearance) => {
+      for (let k = 0; k < 60; k++) {
+        const x = rand(-330, 330), z = rand(-330, 330);
+        if (this.nearest(x, z).dist > half + clearance) return { x, z };
+      }
+      return null;
+    };
+
+    if (theme === 'neon' || theme === 'city') {
+      const count = theme === 'neon' ? 150 : 110;
+      const buildings = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(1, 1, 1),
+        new THREE.MeshStandardMaterial({
+          color: theme === 'neon' ? 0x121426 : 0x2b3542,
+          emissive: def.accent, emissiveIntensity: theme === 'neon' ? 0.28 : 0.04,
+          roughness: 0.7, metalness: 0.25,
+        }), count);
+      const signs = new THREE.InstancedMesh(
+        new THREE.BoxGeometry(1, 1, 0.2),
+        new THREE.MeshBasicMaterial({ color: theme === 'neon' ? 0xff3e9d : 0x48e6ff }), count);
+      let n = 0;
+      while (n < count) {
+        const p = spot(16); if (!p) break;
+        const w = rand(5, 16), h = rand(8, 42), d = rand(5, 16);
+        dummy.position.set(p.x, h / 2, p.z);
+        dummy.rotation.set(0, rand(0, Math.PI), 0);
+        dummy.scale.set(w, h, d);
+        dummy.updateMatrix(); buildings.setMatrixAt(n, dummy.matrix);
+        dummy.position.set(p.x, rand(6, h - 2), p.z + d / 2 + 0.2);
+        dummy.scale.set(w * 0.7, rand(0.4, 1.6), 1);
+        dummy.updateMatrix(); signs.setMatrixAt(n, dummy.matrix);
+        n++;
+      }
+      buildings.count = signs.count = n;
+      buildings.castShadow = true;
+      group.add(buildings, signs);
+    } else if (theme === 'alpine') {
+      const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2.2, 7, 7), new THREE.MeshStandardMaterial({ color: 0x1e5c42, roughness: 1, flatShading: true }), 110);
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 0.4, 2, 6), new THREE.MeshStandardMaterial({ color: 0x3a2b20, roughness: 1 }), 110);
+      const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(2.2, 0), new THREE.MeshStandardMaterial({ color: 0x6a7480, roughness: 1, flatShading: true }), 60);
+      let n = 0;
+      while (n < 110) {
+        const p = spot(12); if (!p) break;
+        const sc = rand(0.7, 1.7);
+        dummy.position.set(p.x, 4.2 * sc, p.z); dummy.rotation.set(0, rand(0, 6.28), 0); dummy.scale.setScalar(sc);
+        dummy.updateMatrix(); trees.setMatrixAt(n, dummy.matrix);
+        dummy.position.set(p.x, 1 * sc, p.z); dummy.updateMatrix(); trunks.setMatrixAt(n, dummy.matrix);
+        n++;
+      }
+      trees.count = trunks.count = n;
+      let r = 0;
+      while (r < 60) {
+        const p = spot(8); if (!p) break;
+        const sc = rand(0.6, 2.2);
+        dummy.position.set(p.x, 0.9 * sc, p.z); dummy.rotation.set(rand(0, 3), rand(0, 6.28), rand(0, 3)); dummy.scale.setScalar(sc);
+        dummy.updateMatrix(); rocks.setMatrixAt(r++, dummy.matrix);
+      }
+      rocks.count = r;
+      trees.castShadow = true;
+      group.add(trees, trunks, rocks);
+    } else if (theme === 'desert') {
+      const rocks = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(2.4, 0), new THREE.MeshStandardMaterial({ color: 0x8a6547, roughness: 1, flatShading: true }), 110);
+      const cacti = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.45, 0.55, 5, 7), new THREE.MeshStandardMaterial({ color: 0x2f6b4a, roughness: 1 }), 70);
+      let n = 0;
+      while (n < 110) {
+        const p = spot(10); if (!p) break;
+        const sc = rand(0.5, 2.4);
+        dummy.position.set(p.x, 1.1 * sc, p.z); dummy.rotation.set(rand(0, 2), rand(0, 6.28), rand(0, 2)); dummy.scale.setScalar(sc);
+        dummy.updateMatrix(); rocks.setMatrixAt(n++, dummy.matrix);
+      }
+      rocks.count = n;
+      let c = 0;
+      while (c < 70) {
+        const p = spot(14); if (!p) break;
+        const sc = rand(0.6, 1.5);
+        dummy.position.set(p.x, 2.5 * sc, p.z); dummy.rotation.set(0, rand(0, 6.28), 0); dummy.scale.setScalar(sc);
+        dummy.updateMatrix(); cacti.setMatrixAt(c++, dummy.matrix);
+      }
+      cacti.count = c;
+      group.add(rocks, cacti);
+    } else {
+      const trees = new THREE.InstancedMesh(new THREE.ConeGeometry(2.2, 7, 7), new THREE.MeshStandardMaterial({ color: 0x1e5c42, roughness: 1, flatShading: true }), 110);
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.3, 0.4, 2, 6), new THREE.MeshStandardMaterial({ color: 0x3a2b20, roughness: 1 }), 110);
+      let n = 0;
+      while (n < 110) {
+        const p = spot(12); if (!p) break;
+        const sc = rand(0.7, 1.6);
+        dummy.position.set(p.x, 4.2 * sc, p.z); dummy.rotation.set(0, rand(0, 6.28), 0); dummy.scale.setScalar(sc);
+        dummy.updateMatrix(); trees.setMatrixAt(n, dummy.matrix);
+        dummy.position.set(p.x, 1 * sc, p.z); dummy.updateMatrix(); trunks.setMatrixAt(n, dummy.matrix);
+        n++;
+      }
+      trees.count = trunks.count = n;
+      trees.castShadow = true;
+      group.add(trees, trunks);
+    }
 
     // Gradient sky dome.
     const sky = new THREE.Mesh(
@@ -232,10 +331,11 @@ export class Track {
     );
     group.add(sky);
 
-    // Lighting.
-    const hemi = new THREE.HemisphereLight(def.skyBot, def.ground, 1.5);
+    // Lighting — night circuits and fog/rain get a moodier setup.
+    const night = !!def.night;
+    const hemi = new THREE.HemisphereLight(def.skyBot, def.ground, night ? 0.95 : (weather?.id === 'fog' ? 1.9 : 1.5));
     group.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff0dc, 2.1);
+    const sun = new THREE.DirectionalLight(night ? 0x8fa8ff : 0xfff0dc, night ? 0.85 : (weather?.id === 'fog' ? 1.3 : 2.1));
     sun.position.set(60, 110, -40);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
@@ -245,6 +345,13 @@ export class Track {
     sun.shadow.bias = -0.0008;
     group.add(sun, sun.target);
     this.sun = sun;
+    if (night) {
+      for (const side of [-1, 1]) {
+        const lamp = new THREE.PointLight(def.accent, 55, 70, 2);
+        lamp.position.set(start.x + start.tz * (half + 2) * side, 8, start.z - start.tx * (half + 2) * side);
+        group.add(lamp);
+      }
+    }
 
     return group;
   }
