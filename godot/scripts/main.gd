@@ -363,22 +363,23 @@ func update_rivals(delta: float) -> void:
 		var to_target := (target - car.global_position).normalized()
 		var angle := forward.signed_angle_to(to_target, Vector3.UP)
 		var steer := clampf(angle / 0.45, -1.0, 1.0)
-		var ahead: Vector3 = track.points[(idx + 8) % track.SAMPLES]
-		var curve := forward.angle_to((ahead - car.global_position).normalized())
-		# A spun-out car sees a ~180° curve and would brake forever. Keep a
-		# minimum target speed so it can always recover.
-		var target_speed := maxf(70.0, 165.0 - curve * 95.0 + float(i) * 7.0)
-		if car.speed_kmh < 14.0 or angle > 1.2:
-			target_speed = 130.0
+		# Use the track's own curvature instead of the car's heading: a spun
+		# car would otherwise see a 180° "corner" and brake forever.
+		var curve := track.tangents[idx].angle_to(track.tangents[(idx + 28) % track.SAMPLES])
+		var target_speed := clampf(175.0 - curve * 320.0 + float(i) * 6.0, 48.0, 172.0)
 		var upside_down := car.global_transform.basis.y.dot(Vector3.UP) < 0.35
-		if upside_down or car.speed_kmh < 3.0:
+		var off := (car.global_position - track.points[idx]).dot(track.rights[idx])
+		var struggling := upside_down or car.speed_kmh < 10.0 or absf(off) > 7.5
+		if struggling:
 			stuck_timers[i] += delta
 		else:
 			stuck_timers[i] = 0.0
-		if stuck_timers[i] > 2.0:
+		if stuck_timers[i] > 2.5:
 			var lane := -2.4 + float((i + 1) % 2) * 4.8
-			car.reset_at(track.points[idx] - track.tangents[idx] * 1.5 + track.rights[idx] * lane, track.tangents[idx])
+			car.reset_at(track.points[idx] + track.tangents[idx] * 2.0 + track.rights[idx] * lane, track.tangents[idx])
 			stuck_timers[i] = 0.0
+		if angle > 1.2:
+			target_speed = 80.0
 		var throttle := 1.0 if car.speed_kmh < target_speed else 0.15
 		var brake := 1.0 if car.speed_kmh > target_speed + 18.0 else 0.0
 		car.drive(throttle, brake, steer, delta)

@@ -40,29 +40,40 @@ var brake_lights: Array[MeshInstance3D] = []
 var flame_lights: Array[MeshInstance3D] = []
 var last_collision_speed := 0.0
 var suspension_offset := 0.0
+var body_top := 1.0
+var body_bottom := -0.32
+var body_front := -2.175
+var body_rear := 2.175
 
 const RATIOS := [3.42, 2.15, 1.52, 1.16, 0.92, 0.74]
 const FINAL_DRIVES := [3.20, 3.70, 4.15]
-const TIRE_GRIPS := [1.10, 1.35, 1.60]
-const REST_LENGTHS := [0.18, 0.26, 0.34]
+# VehicleWheel3D's default friction slip is 10.5. The old 1.1-1.6 values
+# made every car slide on ice and feel impossible to steer.
+const TIRE_GRIPS := [7.0, 10.5, 14.0]
+const REST_LENGTHS := [0.30, 0.38, 0.46]
 const RIDE_OFFSETS := [-0.06, 0.0, 0.07]
 
 
 func _ready() -> void:
 	mass = mass_kg
+	# Without a hull shape, RigidBody3D derives a near-zero inertia and the
+	# wheel forces launch the car. Supply a realistic box inertia manually.
+	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
+	center_of_mass = Vector3(0, -0.25, 0)
+	inertia = Vector3(2200.0, 2400.0, 620.0)
 	linear_damp = 0.02
-	angular_damp = 0.55
+	angular_damp = 0.35
 	cosmetic_root = Node3D.new()
 	cosmetic_root.name = "Cosmetics"
 	add_child(cosmetic_root)
-	# VehicleBody3D needs a hull shape for correct mass/inertia and stable
-	# wheel raycast forces. It sits above the road; wheels do the contact.
+	# A narrow, high hull gives Bullet a chassis for wheel raycasts but stays
+	# inside the wheel track so suspension rays cannot hit the car itself.
 	var hull := CollisionShape3D.new()
 	hull.name = "Hull"
 	var hull_box := BoxShape3D.new()
-	hull_box.size = Vector3(1.8, 0.9, 4.2)
+	hull_box.size = Vector3(1.1, 0.22, 3.2)
 	hull.shape = hull_box
-	hull.position = Vector3(0, 0.15, 0)
+	hull.position = Vector3(0, 0.55, 0)
 	add_child(hull)
 	load_model()
 	build_wheels()
@@ -70,6 +81,8 @@ func _ready() -> void:
 	apply_paint(paint_color)
 	apply_rims(rim_color, rim_style)
 	apply_suspension(suspension_index)
+	set_tire(tire_index)
+	set_final_drive(final_drive_index)
 	rebuild_cosmetics()
 
 
@@ -95,10 +108,13 @@ func load_model() -> void:
 	if packed == null:
 		push_warning("Could not load model: " + model_path)
 		return
+	if model_root != null and is_instance_valid(model_root):
+		model_root.queue_free()
 	model_root = Node3D.new()
 	model_root.name = "SketchfabBody"
 	add_child(model_root)
 	var instance := packed.instantiate()
+	_strip_baked_wheels(instance)
 	model_root.add_child(instance)
 	normalize_model(model_root)
 
@@ -124,21 +140,57 @@ func _aabb(node: Node3D) -> AABB:
 	return box
 
 
+func _strip_baked_wheels(node: Node) -> void:
+	# Drivable wheels are added as VehicleWheel3D nodes with proper suspension.
+	# Source models often contain static wheel meshes that then float or clip.
+	var doomed: Array[Node] = []
+	var stack: Array[Node] = [node]
+	while stack.size() > 0:
+		var n: Node = stack.pop_back()
+		var nname := n.name.to_lower()
+		if nname.contains("wheel") or nname.contains("tire") or nname.contains("tyre") or nname.contains("rim"):
+			doomed.append(n)
+			continue
+		for c in n.get_children():
+			stack.append(c)
+	for n in doomed:
+		n.get_parent().remove_child(n)
+		n.queue_free()
+
+
 func normalize_model(root: Node3D) -> void:
 	root.transform = Transform3D.IDENTITY
 	var box := _aabb(root)
-	if box.size.x <= 0.01 or box.size.z <= 0.01:
+	if box.size.x <= 1e-5 or box.size.z <= 1e-5:
+		push_warning("Degenerate car model: " + model_path)
 		return
-	# Long axis faces forward (-Z in Godot).
+	# Long axis faces forward (-Z in Godot). A 90° yaw also fixes models that
+	# were authored facing +X; check the rotated bounds before committing.
 	if box.size.x > box.size.z:
 		root.rotation.y = PI * 0.5
-		box = _aabb(root)
-	var longest := maxf(box.size.x, box.size.z)
-	var scale := clampf(4.35 / maxf(longest, 0.01), 0.02, 60.0)
-	root.scale = Vector3.ONE * scale
-	box = _aabb(root)
-	var centre := box.get_center()
-	root.position = Vector3(-centre.x, -0.32 - box.position.y, -centre.z)
+		var rotated := _aabb(root)
+		if rotated.size.z >= rotated.size.x * 0.9:
+			box = rotated
+		else:
+			root.rotation.y = 0.0
+	# Source GLBs range from a 0.25 m goblin to a 138 m detailed concept car.
+	# A single uniform scale cannot fit both, so fit width and length
+	# independently while keeping the vertical scale believable.
+	var sx := 1.85 / maxf(box.size.x, 1e-5)
+	var sy := 1.35 / maxf(box.size.y, 1e-5)
+	var sz := 4.35 / maxf(box.size.z, 1e-5)
+	root.scale = Vector3(sx, sy, sz)
+	var fitted := _aabb(root)
+	root.position = Vector3(
+		-fitted.get_center().x,
+		-0.30 - fitted.position.y,
+		-fitted.get_center().z
+	)
+	fitted = _aabb(root)
+	body_bottom = fitted.position.y
+	body_top = fitted.end.y
+	body_front = fitted.position.z
+	body_rear = fitted.end.z
 
 
 func _paintable(mat: Material) -> bool:
@@ -200,7 +252,7 @@ func build_wheels() -> void:
 		for z in [-1.38, 1.38]:
 			var w := VehicleWheel3D.new()
 			w.name = "Wheel_%s_%s" % [("L" if x < 0 else "R"), ("F" if z < 0 else "R")]
-			w.position = Vector3(x, -0.12, z)
+			w.position = Vector3(x, 0.02, z)
 			w.wheel_radius = 0.36
 			w.wheel_rest_length = REST_LENGTHS[suspension_index]
 			# Bullet's wheel spring is tuned for a 40 kg default body. Scale it
@@ -360,23 +412,25 @@ func rebuild_cosmetics() -> void:
 	accent.emission = Color(0.15, 0.55, 0.9)
 	accent.emission_energy = 0.5
 	accent.roughness = 0.35
+	var half_width := clampf((body_top - body_bottom) * 1.6 + 0.3, 0.8, 1.2)
+	var body_len := body_rear - body_front
 	if spoiler_enabled:
 		var wing := MeshInstance3D.new()
 		var wing_mesh := BoxMesh.new()
-		wing_mesh.size = Vector3(1.75, 0.08, 0.42)
+		wing_mesh.size = Vector3(half_width * 2.0, 0.08, 0.42)
 		wing_mesh.material = accent
 		wing.mesh = wing_mesh
-		wing.position = Vector3(0, 1.02, 2.02)
+		wing.position = Vector3(0, body_top + 0.10, body_rear - 0.16)
 		wing.rotation.x = -0.10
 		wing.material_override = accent
 		cosmetic_root.add_child(wing)
-		for x in [-0.68, 0.68]:
+		for x in [-half_width * 0.7, half_width * 0.7]:
 			var strut := MeshInstance3D.new()
 			var strut_mesh := BoxMesh.new()
 			strut_mesh.size = Vector3(0.07, 0.38, 0.12)
 			strut_mesh.material = accent
 			strut.mesh = strut_mesh
-			strut.position = Vector3(x, 0.82, 2.02)
+			strut.position = Vector3(x, body_top - 0.08, body_rear - 0.16)
 			strut.material_override = accent
 			cosmetic_root.add_child(strut)
 	if decal_style > 0:
@@ -389,10 +443,10 @@ func rebuild_cosmetics() -> void:
 		for x in offsets:
 			var stripe := MeshInstance3D.new()
 			var stripe_mesh := BoxMesh.new()
-			stripe_mesh.size = Vector3(0.12 if absf(x) > 0.01 else 0.22, 0.012, 3.6)
+			stripe_mesh.size = Vector3(0.12 if absf(x) > 0.01 else 0.22, 0.012, body_len * 0.82)
 			stripe_mesh.material = decal_mat
 			stripe.mesh = stripe_mesh
-			stripe.position = Vector3(x, 0.86, -0.1)
+			stripe.position = Vector3(x, body_top + 0.012, (body_front + body_rear) * 0.5)
 			stripe.material_override = decal_mat
 			cosmetic_root.add_child(stripe)
 
@@ -460,7 +514,7 @@ func drive(throttle: float, brake_input: float, steer_input: float, dt: float) -
 	var torque_curve := 1.0 - clampf((rpm - 6500.0) / 2200.0, 0.0, 0.45)
 	# Wheel force scales WITH the gear ratio, not against it. Dividing by the
 	# ratio made a 1250 kg car accelerate at 0.1 m/s² and never reach speed.
-	var gear_mult := clampf(ratio * 0.14, 0.35, 2.0)
+	var gear_mult := clampf(ratio * 0.10, 0.35, 1.35)
 	var force := engine_force_max * throttle * torque_curve * gear_mult
 	if reverse:
 		force = -absf(engine_force_max) * throttle * 0.30
@@ -470,7 +524,10 @@ func drive(throttle: float, brake_input: float, steer_input: float, dt: float) -
 	# every direction in this game (camera, AI, spawn) treats -Z as forward.
 	engine_force = -force
 	brake = brake_input * brake_force_max
-	steering = lerpf(steering, clampf(steer_input, -1.0, 1.0) * 0.48, 0.16)
+	# Speed-sensitive steering: enough angle to recover at walking pace, calm
+	# enough at 180 km/h that a tap does not spin the car.
+	var max_angle := lerpf(0.58, 0.22, clampf(speed_kmh / 180.0, 0.0, 1.0))
+	steering = lerpf(steering, clampf(steer_input, -1.0, 1.0) * max_angle, clampf(dt * 14.0, 0.0, 1.0))
 	for light in brake_lights:
 		var m := light.material_override as StandardMaterial3D
 		if m != null:

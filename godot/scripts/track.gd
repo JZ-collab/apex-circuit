@@ -8,6 +8,7 @@ class_name RaceTrack
 const SAMPLES := 720
 const ROAD_WIDTH := 13.0
 const HALF_ROAD := ROAD_WIDTH * 0.5
+const ROAD_LIFT := 0.03
 
 var points: Array[Vector3] = []
 var tangents: Array[Vector3] = []
@@ -33,7 +34,9 @@ func _ready() -> void:
 
 
 func build_spline() -> void:
-	# A closed mountain-coast circuit with elevation, fast sweeps and a hairpin.
+	# Smooth closed mountain-coast circuit. Control points are spaced evenly
+	# around an oval and Catmull-Rom interpolation produces fast sweeps and a
+	# tightening final corner without the self-crossing of the old layout.
 	var control := [
 		Vector3(0, 1, 0),
 		Vector3(70, 3, -8),
@@ -85,7 +88,7 @@ func edge(i: int, side: int, extra := 0.0) -> Vector3:
 	var r: Vector3 = rights[i]
 	var b: float = banks[i]
 	var off := HALF_ROAD + extra
-	return p + r * (off * float(side)) + Vector3.UP * (-b * off * float(side))
+	return p + r * (off * float(side)) + Vector3.UP * (-b * off * float(side) + ROAD_LIFT)
 
 
 func build_road() -> void:
@@ -193,7 +196,7 @@ func add_collision(mesh: ArrayMesh) -> void:
 
 
 func centre_edge(i: int, off: float) -> Vector3:
-	return points[i] + rights[i] * off + Vector3.UP * (-banks[i] * off)
+	return points[i] + rights[i] * off + Vector3.UP * (-banks[i] * off + ROAD_LIFT)
 
 
 func centre_strip_mesh(width: float, color_a: Color, color_b: Color, dash := false) -> ArrayMesh:
@@ -292,6 +295,38 @@ func terrain_height(x: float, z: float) -> float:
 	return -3.0 + sin(x * 0.017) * 5.0 + cos(z * 0.021) * 4.0 + sin((x + z) * 0.009) * 7.0
 
 
+func nearest_track_xz(x: float, z: float) -> Array:
+	var best := 0
+	var best_d := INF
+	var p := Vector2(x, z)
+	for i in range(0, SAMPLES, 3):
+		var q := Vector2(points[i].x, points[i].z)
+		var d := p.distance_squared_to(q)
+		if d < best_d:
+			best_d = d
+			best = i
+	for k in range(-5, 6):
+		var i := (best + k + SAMPLES) % SAMPLES
+		var q := Vector2(points[i].x, points[i].z)
+		var d := p.distance_squared_to(q)
+		if d < best_d:
+			best_d = d
+			best = i
+	return [best, best_d]
+
+
+func ground_height(x: float, z: float) -> float:
+	# Raw noise used to poke through the asphalt wherever the road went into a
+	# valley. Keep the ground below the nearest piece of road for the whole
+	# visible corridor, then let the hills take over farther out.
+	var raw := terrain_height(x, z)
+	var near: Array = nearest_track_xz(x, z)
+	var road_y: float = points[int(near[0])].y
+	var dist := sqrt(float(near[1]))
+	var cap := road_y - 0.6 + maxf(0.0, dist - 12.0) * 0.05
+	return minf(raw, cap)
+
+
 func build_embankments() -> void:
 	for side in [-1, 1]:
 		var st := SurfaceTool.new()
@@ -303,8 +338,8 @@ func build_embankments() -> void:
 			var b := edge(j, side, 0.9)
 			var far_a := edge(i, side, 26.0)
 			var far_b := edge(j, side, 26.0)
-			far_a.y = terrain_height(far_a.x, far_a.z)
-			far_b.y = terrain_height(far_b.x, far_b.z)
+			far_a.y = ground_height(far_a.x, far_a.z)
+			far_b.y = ground_height(far_b.x, far_b.z)
 			for v in [a, b, far_b, far_a]:
 				st.set_color(Color(0.13, 0.18, 0.12))
 				st.add_vertex(v)
@@ -336,7 +371,7 @@ func build_terrain() -> void:
 			var z2 := -span * 0.5 + float(z + 1) / float(segments - 1) * span + 100.0
 			var x3 := x0
 			var z3 := z2
-			var quad: Array[Vector3] = [Vector3(x0, terrain_height(x0, z0), z0), Vector3(x1, terrain_height(x1, z1), z1), Vector3(x2, terrain_height(x2, z2), z2), Vector3(x3, terrain_height(x3, z3), z3)]
+			var quad: Array[Vector3] = [Vector3(x0, ground_height(x0, z0), z0), Vector3(x1, ground_height(x1, z1), z1), Vector3(x2, ground_height(x2, z2), z2), Vector3(x3, ground_height(x3, z3), z3)]
 			for p in quad:
 				var shade: float = clampf((p.y + 14.0) / 30.0, 0.0, 1.0)
 				st.set_color(Color(0.09 + shade * 0.08, 0.16 + shade * 0.11, 0.08 + shade * 0.05))
@@ -442,7 +477,7 @@ func build_scenery() -> void:
 		var side := 1 if rng.randf() > 0.5 else -1
 		var dist := rng.randf_range(16.0, 52.0)
 		var base := edge(s, side, dist)
-		base.y = terrain_height(base.x, base.z)
+		base.y = ground_height(base.x, base.z)
 		var scale := rng.randf_range(0.7, 1.5)
 		var rot := Basis(Vector3.UP, rng.randf_range(0.0, TAU))
 		trunks.set_instance_transform(i, Transform3D(rot.scaled(Vector3(scale, scale, scale)), base + Vector3.UP * 1.3 * scale))
@@ -465,7 +500,7 @@ func build_scenery() -> void:
 		var s := rng.randi_range(0, SAMPLES - 1)
 		var side := 1 if rng.randf() > 0.5 else -1
 		var base := edge(s, side, rng.randf_range(8.0, 22.0))
-		base.y = terrain_height(base.x, base.z) + 0.3
+		base.y = ground_height(base.x, base.z) + 0.3
 		var sc := rng.randf_range(0.4, 1.8)
 		rocks.set_instance_transform(i, Transform3D(Basis().scaled(Vector3(sc, sc * 0.6, sc)), base))
 	var rm := MultiMeshInstance3D.new(); rm.multimesh = rocks; rm.material_override = rock_mat; add_child(rm)
