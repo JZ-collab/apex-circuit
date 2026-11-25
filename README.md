@@ -78,6 +78,8 @@ The native edition is a real Godot 4 game — no Electron, HTML or JavaScript ru
 | `Apex-Circuit-Linux.zip` | Linux x86_64 | Extract, `chmod +x 'Apex Circuit.x86_64'`, then run it. Keep the `.pck` beside it. |
 | `Apex-Circuit-Web.zip` | Chromebook / browser | Extract and serve the folder over HTTP (for example `python3 -m http.server`). |
 
+macOS builds are not notarized. If Gatekeeper blocks the app, right-click `Apex Circuit.app` and choose **Open**, then confirm.
+
 ### Build them yourself
 
 Requirements: Godot 4.7+ with export templates installed.
