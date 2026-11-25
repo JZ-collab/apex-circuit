@@ -66,41 +66,33 @@ Touch controls appear automatically on touchscreen devices.
 
 ## Native desktop builds
 
-The desktop app is an Electron shell around the exact same game, served from an internal localhost HTTP server so ES modules and assets work identically to the web version. No internet connection is needed to play.
+The native edition is a real Godot 4 game — no Electron, HTML or JavaScript runtime. Ready-to-run builds are published on the [Releases page](https://github.com/JZ-collab/apex-circuit/releases/latest).
 
 ### Download / use prebuilt apps
 
-After a build, find finished artifacts in `dist/`:
-
-| File | Platform |
-|---|---|
-| `Apex-Circuit-macOS.dmg` + `dist/Apex Circuit-darwin-arm64/.../Apex Circuit.app` | macOS Apple Silicon |
-| `Apex Circuit-darwin-x64/.../Apex Circuit.app` (+ tar.gz) | macOS Intel |
-| `Apex-Circuit-win32-x64.zip` / `Apex-Circuit-win32-ia32.zip` | Windows (extract, run `Apex Circuit.exe`) |
-| `Apex-Circuit-linux-x64.tar.gz` / `Apex-Circuit-linux-arm64.tar.gz` | Linux (extract, run `Apex Circuit`) |
+| Asset | Platform | Instructions |
+|---|---|---|
+| `Apex-Circuit-macOS.dmg` | macOS | Open the disk image and drag `Apex Circuit.app` to Applications. |
+| `Apex-Circuit-macOS.zip` | macOS | Unzip and run `Apex Circuit.app`. |
+| `Apex-Circuit-Windows.zip` | Windows x86_64 | Extract and run `Apex Circuit.exe`. Keep the `.pck` beside it. |
+| `Apex-Circuit-Linux.zip` | Linux x86_64 | Extract, `chmod +x 'Apex Circuit.x86_64'`, then run it. Keep the `.pck` beside it. |
+| `Apex-Circuit-Web.zip` | Chromebook / browser | Extract and serve the folder over HTTP (for example `python3 -m http.server`). |
 
 ### Build them yourself
 
-Requirements: Node.js 18+, npm, `zip` and (on macOS) `hdiutil`.
+Requirements: Godot 4.7+ with export templates installed.
 
 ```bash
-cd apex-circuit
-npm install
-npm run build:all          # all six targets
-# or: npm run build:mac / build:win / build:linux
+godot --headless --path godot --export-release "macOS" "../dist/godot/macos/Apex Circuit.app"
+godot --headless --path godot --export-release "Windows Desktop" "../dist/godot/windows/Apex Circuit.exe"
+godot --headless --path godot --export-release "Linux" "../dist/godot/linux/Apex Circuit.x86_64"
+godot --headless --path godot --export-release "Web" "../dist/godot/web/index.html"
 ```
 
-Icons are generated from `electron/make-icons.py` (pure Python, no Pillow needed) and converted with `sips`/`iconutil` on macOS:
+Run from source without packaging:
 
 ```bash
-python3 electron/make-icons.py
-# then build assets/icon.icns / icon.ico / icon.png as needed
-```
-
-Run the desktop app from source without packaging:
-
-```bash
-npm start
+godot --path godot
 ```
 
 ## Browser / GitHub Pages version
