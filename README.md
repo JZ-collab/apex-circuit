@@ -2,9 +2,30 @@
 
 A complete 3D racing + tuning game that ships as **native desktop apps** (macOS `.app` / `.dmg`, Windows `.exe`, Linux) **and** as a browser/GitHub Pages game. One codebase, every platform: Mac, Windows, Linux, Chromebook, tablet and phone.
 
-**Play it now:** [https://jz-collab.github.io/apex-circuit/](https://jz-collab.github.io/apex-circuit/)
+**Play the published legacy game now:** [https://jz-collab.github.io/apex-circuit/](https://jz-collab.github.io/apex-circuit/)
 
-## Graphics / creator overhaul
+## Native Godot edition (new)
+
+The next-generation build lives in [`godot/`](godot/). It is a real Godot 4 project — no HTML, no
+JavaScript, no Electron wrapper — with six real Sketchfab GLB cars, a procedurally generated banked
+mountain circuit with terrain, curbs, guardrails, markings and a start gantry, vehicle-physics
+racing, AI rivals, lap timing, chase/orbit cameras and a deep garage (paint, rim colour/style,
+engine swaps, final drive, tires, suspension, spoiler and decals).
+
+- **Run from source:** `godot --path godot`
+- **Headless smoke test:** `godot --headless --path godot --quit-after 90`
+- **Reverse → 1st regression:** `godot --headless --path godot --script res://scripts/test_reverse.gd`
+- **Exports:** macOS, Windows, Linux and Web (Chromebook) presets are in
+  [`godot/export_presets.cfg`](godot/export_presets.cfg).
+- **Model licences and attribution:** [`godot/CREDITS.md`](godot/CREDITS.md).
+
+The reverse-to-first-gear NaN glitch is fixed in both editions: the legacy JS fix is in
+`js/physics.js`, and the native gearbox keeps the gear/ratio transition atomic in
+`godot/scripts/car.gd`.
+
+The GitHub Pages site continues to serve the legacy v2 build unchanged.
+
+## Graphics / creator overhaul (legacy v2)
 
 - **Cinematic rendering** — HDR-style bloom, filmic ACES tone mapping, FXAA, procedural PMREM environment reflections, 2048px soft shadows, cool fill lighting, glowing sun/moon discs and night starfields.
 - **Creator Series** — three original, hand-authored 3D cars (GT, Rally and Hyper) built from real geometry, not imported assets. They take paint, metalness, lights, wheels, liveries and tuning exactly like the licensed models.

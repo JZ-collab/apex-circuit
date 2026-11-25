@@ -62,7 +62,9 @@ export class Vehicle {
       this.gear = -1;
       this.rpm = 900 + Math.min(absSpeed * 130, 3200) + throttle * 900;
     } else {
-      const ratio = s.ratios[Math.min(this.gear - 1, s.ratios.length - 1)] * s.final;
+      // Guard against -1 leaking out of reverse and indexing ratios negatively.
+      this.gear = clamp(this.gear, 1, s.ratios.length);
+      const ratio = s.ratios[clamp(this.gear - 1, 0, s.ratios.length - 1)] * s.final;
       const wheelRpm = absSpeed / (2 * Math.PI * WHEEL_RADIUS) * 60;
       this.rpm = clamp(Math.max(850 + throttle * 1200, wheelRpm * ratio), 850, s.redline);
       if (this.shiftTimer <= 0) {
@@ -75,8 +77,22 @@ export class Vehicle {
         }
       }
     }
-    if (absSpeed < 1.2 && brake > 0.5 && throttle < 0.1 && !this.reverse) this.reverse = true;
-    if (this.reverse && throttle > 0.5 && absSpeed < 1.5) this.reverse = false;
+    // Reverse engage/disengage is a state change with an explicit gear reset.
+    // Without this, gear stayed at -1 after shifting back to drive and the
+    // negative ratio index produced NaN RPM/force (the visible "glitch").
+    if (!this.reverse && absSpeed < 1.2 && brake > 0.5 && throttle < 0.1) {
+      this.reverse = true;
+      this.gear = -1;
+      this.shiftTimer = Math.max(this.shiftTimer, 0.18);
+      this.onShift?.();
+    }
+    if (this.reverse && throttle > 0.5 && absSpeed < 2.0) {
+      this.reverse = false;
+      this.gear = 1;
+      this.rpm = 1100;
+      this.shiftTimer = Math.max(this.shiftTimer, 0.22);
+      this.onShift?.();
+    }
 
     // --- longitudinal force ------------------------------------------------
     let fx = Math.sin(this.heading), fz = Math.cos(this.heading);
@@ -85,7 +101,7 @@ export class Vehicle {
     const condition = 1 - this.damage * 0.34;
     let engineForce = 0;
     if (this.shiftTimer <= 0 && throttle > 0) {
-      const ratio = this.reverse ? 3.4 : s.ratios[Math.min(this.gear - 1, s.ratios.length - 1)] * s.final;
+      const ratio = this.reverse ? 3.4 : s.ratios[clamp(this.gear - 1, 0, s.ratios.length - 1)] * s.final;
       const gearFactor = ratio / 3.4;
       engineForce = s.hp * 42 * throttle * gearFactor * s.resp * s.accel * condition;
       if (this.boosting) engineForce *= 1 + s.boost;
