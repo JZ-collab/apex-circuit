@@ -5,7 +5,7 @@ const CORE = [
   './js/main.js', './js/ui.js', './js/config.js', './js/storage.js',
   './js/assets.js', './js/car.js', './js/track.js', './js/physics.js',
   './js/ai.js', './js/audio.js', './js/effects.js', './js/env.js',
-  './js/original-models.js',
+  './js/original-models.js', './js/grade-shader.js',
   './vendor/three.module.js', './vendor/GLTFLoader.js',
   './vendor/utils/BufferGeometryUtils.js',
   './vendor/geometries/RoundedBoxGeometry.js',

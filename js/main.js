@@ -14,6 +14,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import { GradeShader } from './grade-shader.js';
 import { TRACKS, RIVALS, REWARDS, WEATHER, DIFFICULTIES, findPart, computeSpecs } from './config.js';
 
 const canvas = document.getElementById('game');
@@ -87,10 +88,12 @@ const composer = new EffectComposer(renderer);
 const renderPass = new RenderPass(showroom, camera);
 const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.62, 0.62, 0.72);
 const outputPass = new OutputPass();
+const grade = new ShaderPass(GradeShader);
 const fxaa = new ShaderPass(FXAAShader);
 composer.addPass(renderPass);
 composer.addPass(bloom);
 composer.addPass(outputPass);
+composer.addPass(grade);
 composer.addPass(fxaa);
 function resizePipeline() {
   const w = window.innerWidth, h = window.innerHeight;
@@ -390,8 +393,11 @@ function updatePreviewCamera(dt) {
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
+  grade.uniforms.time.value += dt;
 
   if (race && (mode === 'race' || mode === 'pause' || mode === 'results')) {
+    const speedFx = race.player.boosting ? 0.016 : Math.min(Math.abs(race.player.speed) / 2600, 0.006);
+    grade.uniforms.aberration.value = THREE.MathUtils.lerp(grade.uniforms.aberration.value, speedFx, 0.08);
     const r = race;
 
     if (mode === 'race') tickRace(r, dt);
@@ -433,6 +439,7 @@ function frame() {
     renderPass.scene = r.scene;
     composer.render(dt);
   } else {
+    grade.uniforms.aberration.value = THREE.MathUtils.lerp(grade.uniforms.aberration.value, 0.002, 0.08);
     if (previewCar) previewCar.update(dt, { speed: 0, steer: 0, accel: 0 });
     updatePreviewCamera(dt);
     renderPass.scene = showroom;
